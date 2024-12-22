@@ -117,3 +117,9 @@ class BaseCamera(object):
             logger.exception(f"Error in camera thread: {e}")
         finally:
             BaseCamera.thread = None
+
+    def stop_thread(self):
+        """Stop the background camera thread."""
+        logger.info("BaseCamera: Stopping thread.")
+        self.last_access = 0  # Reset last access to ensure the thread stops.
+        self.event.set()  # Wake up the thread if it's waiting for a frame.

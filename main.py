@@ -3,6 +3,7 @@ import atexit
 import signal
 import logging
 import uvicorn
+import asyncio
 
 # Custom modules
 from functions import Functions
@@ -130,9 +131,21 @@ if __name__ == "__main__":
 
 	robot_control = RobotControl()
 
+	def cancel_all_tasks():
+		tasks = asyncio.all_tasks()
+		for t in tasks:
+			logger.info(f"Running task: {t}")
+			t.cancel()
+		logger.info("All asyncio tasks have been canceled.")
+
 	def graceful_shutdown(*args):
 		logger.info("Executing graceful shutdown...")
-		robot_control.shutdown_components()
+		try:
+			robot_control.shutdown_components()
+			cancel_all_tasks()
+		finally:
+			logger.info("Exiting process.")
+			sys.exit(0)
 
 	atexit.register(graceful_shutdown)
 	signal.signal(signal.SIGINT, graceful_shutdown)

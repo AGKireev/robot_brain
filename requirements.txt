@@ -22,3 +22,5 @@ python-dotenv
 adafruit-circuitpython-pca9685
 adafruit-circuitpython-motor
 adafruit-circuitpython-busdevice
+rpi-libcamera
+rpi-kms
