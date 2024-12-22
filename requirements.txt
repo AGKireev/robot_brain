@@ -15,8 +15,10 @@ adafruit-blinka
 adafruit-circuitpython-pca9685
 picamera2
 opencv-python
-adafruit-circuitpython-board
 fastapi
 starlette
 uvicorn
 python-dotenv
+adafruit-circuitpython-pca9685
+adafruit-circuitpython-motor
+adafruit-circuitpython-busdevice
