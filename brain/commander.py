@@ -166,8 +166,8 @@ class Commander:
 
     def _handle_camera_home(self):
         """Reset camera position to home."""
-        self.servo_camera_lr.single_servo(12, 0, 7)
-        self.servo_camera_ud.single_servo(13, 0, 7)
+        self.servo_camera_lr.move_angle(12, 0)
+        self.servo_camera_ud.move_angle(13, 0)
 
     def _handle_get_info(self):
         """Get system information."""
