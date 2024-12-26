@@ -4,9 +4,9 @@ import signal
 import logging
 import uvicorn
 import asyncio
+from mpu6050 import mpu6050
 
 # Custom modules
-from functions import Functions
 from camera.opencv import Camera
 from web.api import WebApi
 from brain.commander import Commander
@@ -25,49 +25,50 @@ logger = logging.getLogger(__name__)
 # modeSelect = 'none'
 # modeSelect = 'PT'
 
-class RobotControl:
+class Robot:
 	def __init__(self):
-		self.legs = None
-		self.P_sc = None
-		self.T_sc = None
+		self.servo_legs = None
+		self.servo_camera_lr = None
+		self.servo_camera_ud = None
 		self.camera = None
 		self.light_strip = None
 		self.api = None
+		self.sensor = None  # MPU6050 sensor, accelerometer and gyroscope
 
-	def initialize_components(self):
-		logger.info("RobotControl.initialize_components")
-
-		try:
-			Functions().start()
-		except Exception as e:
-			logger.error(f"Failed to start Functions: {e}")
-			sys.exit(1)
-		logger.info("RobotControl.functions started")
+	def init_components(self):
+		logger.info("Robot.init_components")
 
 		try:
-			self.legs = ServoCtrl()
-			self.legs.move_init()
+			self.sensor = mpu6050(0x68)
 		except Exception as e:
-			logger.error(f"Failed to initialize ServoCtrl: {e}")
+			logger.error(f"Robot.Failed to initialize sensor: {e}")
 			sys.exit(1)
-		logger.info("RobotControl.legs initialized")
+		logger.info("Robot.sensor initialized")
 
 		try:
-			self.P_sc = ServoCtrl()
-			self.P_sc.start()
-			self.T_sc = ServoCtrl()
-			self.T_sc.start()
+			self.servo_legs = ServoCtrl()
+			self.servo_legs.move_init()
 		except Exception as e:
-			logger.error(f"Failed to initialize Pan/Tilt Servos: {e}")
+			logger.error(f"Robot.Failed to initialize Legs Servos: {e}")
 			sys.exit(1)
-		logger.info("RobotControl.camera servo initialized")
+		logger.info("Robot.legs servos initialized")
 
 		try:
-			self.camera = Camera()  # TODO: Check that no one else initializes Camera()!
+			self.servo_camera_lr = ServoCtrl()
+			self.servo_camera_lr.start()
+			self.servo_camera_ud = ServoCtrl()
+			self.servo_camera_ud.start()
 		except Exception as e:
-			logger.error(f"Failed to initialize Camera: {e}")
+			logger.error(f"Robot.Failed to initialize Camera Servos: {e}")
 			sys.exit(1)
-		logger.info("RobotControl.camera initialized")
+		logger.info("Robot.camera servo initialized")
+
+		try:
+			self.camera = Camera()
+		except Exception as e:
+			logger.error(f"Robot.Failed to initialize Camera: {e}")
+			sys.exit(1)
+		logger.info("Robot.camera initialized")
 
 		try:
 			self.light_strip = LightStrip()
@@ -76,75 +77,75 @@ class RobotControl:
 			# RL.breath(70,70,255)
 			# RL.rainbow()
 		except Exception as e:
-			logger.error(f"Failed to initialize LightStrip: {e}")
+			logger.error(f"Robot.Failed to initialize LightStrip: {e}")
 			sys.exit(1)
-		logger.info("RobotControl.light_strip initialized")
+		logger.info("Robot.light_strip initialized")
 
 		# Commander
 		try:
 			commander = Commander(
-				legs=self.legs,
-				P_sc=self.P_sc,
-				T_sc=self.T_sc,
-				RL=self.light_strip,
+				servo_legs=self.servo_legs,
+				servo_camera_lr=self.servo_camera_lr,
+				servo_camera_ud=self.servo_camera_ud,
+				light_strip=self.light_strip,
 				camera=self.camera
 			)
 		except Exception as e:
-			logger.error(f"Failed to initialize Commander: {e}")
+			logger.error(f"Robot.Failed to initialize Commander: {e}")
 			sys.exit(1)
-		logger.info("RobotControl.brain initialized")
+		logger.info("Robot.brain initialized")
 
 		# Initialize WebApi
 		try:
 			self.api = WebApi(self.camera, commander)
 		except Exception as e:
-			logger.error(f"Failed to initialize WebApi: {e}")
+			logger.error(f"Robot.Failed to initialize WebApi: {e}")
 			sys.exit(1)
-		logger.info("RobotControl.api initialized")
+		logger.info("Robot.api initialized")
 
 	def shutdown_components(self):
-		logger.info("RobotControl.shutdown_components")
+		logger.info("Robot.shutdown_components")
 		if self.light_strip:
 			try:
 				self.light_strip.pause()
 			except Exception as e:
-				logger.error(f"Error shutting down LightStrip: {e}")
+				logger.error(f"Robot.Error shutting down LightStrip: {e}")
 
-		for c in [self.legs, self.P_sc, self.T_sc]:
+		for c in [self.servo_legs, self.servo_camera_lr, self.servo_camera_ud]:
 			if c:
 				try:
 					c.shutdown()
 				except Exception as e:
-					logger.error(f"Error shutting down component {c}: {e}")
+					logger.error(f"Robot.Error shutting down component {c}: {e}")
 
 		if self.camera:
 			try:
 				self.camera.stop_thread()
 			except Exception as e:
-				logger.error(f"Error stopping Camera: {e}")
+				logger.error(f"Robot.Error stopping Camera: {e}")
 
-		logger.info("RobotControl.shutdown_components done")
+		logger.info("Robot.shutdown_components done")
 
 
 if __name__ == "__main__":
 	logger.info('main.init')
 
-	robot_control = RobotControl()
+	robot = Robot()
 
 	def cancel_all_tasks():
 		tasks = asyncio.all_tasks()
 		for t in tasks:
-			logger.info(f"Running task: {t}")
+			logger.info(f"main.Running task: {t}")
 			t.cancel()
-		logger.info("All asyncio tasks have been canceled.")
+		logger.info("main.All asyncio tasks have been canceled.")
 
 	def graceful_shutdown(*args):
-		logger.info("Executing graceful shutdown...")
+		logger.info("main.Executing graceful shutdown...")
 		try:
-			robot_control.shutdown_components()
+			robot.shutdown_components()
 			cancel_all_tasks()
 		finally:
-			logger.info("Exiting process.")
+			logger.info("main.Exiting process.")
 			sys.exit(0)
 
 	atexit.register(graceful_shutdown)
@@ -152,9 +153,9 @@ if __name__ == "__main__":
 	signal.signal(signal.SIGTERM, graceful_shutdown)
 
 	try:
-		robot_control.initialize_components()
-		logger.info("Starting server with uvicorn")
-		uvicorn.run(robot_control.api.app, host="0.0.0.0", port=8000)
+		robot.init_components()
+		logger.info("main.Start server")
+		uvicorn.run(robot.api.app, host="0.0.0.0", port=8000)
 	except Exception as e:
-		logger.error(f"Unexpected error: {e}")
+		logger.error(f"main.Unexpected error: {e}")
 		graceful_shutdown()

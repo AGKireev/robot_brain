@@ -30,7 +30,6 @@ logger = logging.getLogger(__name__)
 CVRun = 1
 linePos_1 = 440
 linePos_2 = 380
-lineColorSet = 255
 frameRender = 1
 findLineError = 60
 
@@ -120,30 +119,6 @@ class CVThread(threading.Thread):
 			if self.radius > 10 and self.drawing:
 				cv2.rectangle(img_input,(int(self.box_x-self.radius),int(self.box_y+self.radius)),(int(self.box_x+self.radius),int(self.box_y-self.radius)),(255,255,255),1)
 
-		elif self.CVMode == 'findlineCV':
-			if frameRender:
-				img_input = cv2.cvtColor(img_input, cv2.COLOR_BGR2GRAY)
-				retval_bw, img_input =  cv2.threshold(img_input, 0, 255, cv2.THRESH_OTSU)
-				img_input = cv2.erode(img_input, None, iterations=6)
-			try:
-				if lineColorSet == 255:
-					cv2.putText(img_input, ('Following White Line'),(30,50), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(128,255,128),1,cv2.LINE_AA)
-				else:
-					cv2.putText(img_input, ('Following Black Line'),(30,50), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(128,255,128),1,cv2.LINE_AA)
-
-				cv2.line(img_input,(self.left_Pos1,(linePos_1+30)),(self.left_Pos1,(linePos_1-30)),(255,128,64),1)
-				cv2.line(img_input,(self.right_Pos1,(linePos_1+30)),(self.right_Pos1,(linePos_1-30)),(64,128,255),)
-				cv2.line(img_input,(0,linePos_1),(640,linePos_1),(255,255,64),1)
-
-				cv2.line(img_input,(self.left_Pos2,(linePos_2+30)),(self.left_Pos2,(linePos_2-30)),(255,128,64),1)
-				cv2.line(img_input,(self.right_Pos2,(linePos_2+30)),(self.right_Pos2,(linePos_2-30)),(64,128,255),1)
-				cv2.line(img_input,(0,linePos_2),(640,linePos_2),(255,255,64),1)
-
-				cv2.line(img_input,((self.center-20), int((linePos_1+linePos_2)/2)),((self.center+20),int((linePos_1+linePos_2)/2)),(0,0,0),1)
-				cv2.line(img_input,((self.center), int((linePos_1+linePos_2)/2+20)),((self.center),int((linePos_1+linePos_2)/2-20)),(0,0,0),1)
-			except:
-				pass
-
 		elif self.CVMode == 'watchDog':
 			if self.drawing:
 				cv2.rectangle(img_input, (self.mov_x, self.mov_y), (self.mov_x + self.mov_w, self.mov_y + self.mov_h), (128, 255, 0), 1)
@@ -213,58 +188,6 @@ class CVThread(threading.Thread):
 			# switch.switch(2,0)
 			# switch.switch(3,0)
 		self.pause()
-
-
-	def find_line_ctrl(self, posInput, setCenter):#2
-		if posInput and setCenter:
-			if posInput > (setCenter + findLineError):
-				servo.move.command('right')
-				logger.info('CVThread: findLineCtrl right')
-				pass
-			elif posInput < (setCenter - findLineError):
-				servo.move.command('left')
-				logger.info('CVThread: findLineCtrl left')
-				pass
-			else:
-				servo.move.command('forward')
-				time.sleep(1)
-				pass
-
-
-	def find_line_cv(self, frame_image):
-		frame_findline = cv2.cvtColor(frame_image, cv2.COLOR_BGR2GRAY)
-		retval, frame_findline =  cv2.threshold(frame_findline, 0, 255, cv2.THRESH_OTSU)
-		frame_findline = cv2.erode(frame_findline, None, iterations=6)
-		colorPos_1 = frame_findline[linePos_1]
-		colorPos_2 = frame_findline[linePos_2]
-		try:
-			lineColorCount_Pos1 = np.sum(colorPos_1 == lineColorSet)
-			lineColorCount_Pos2 = np.sum(colorPos_2 == lineColorSet)
-
-			lineIndex_Pos1 = np.where(colorPos_1 == lineColorSet)
-			lineIndex_Pos2 = np.where(colorPos_2 == lineColorSet)
-
-			if lineColorCount_Pos1 == 0:
-				lineColorCount_Pos1 = 1
-			if lineColorCount_Pos2 == 0:
-				lineColorCount_Pos2 = 1
-
-			self.left_Pos1 = lineIndex_Pos1[0][lineColorCount_Pos1-1]
-			self.right_Pos1 = lineIndex_Pos1[0][0]
-			self.center_Pos1 = int((self.left_Pos1+self.right_Pos1)/2)
-
-			self.left_Pos2 = lineIndex_Pos2[0][lineColorCount_Pos2-1]
-			self.right_Pos2 = lineIndex_Pos2[0][0]
-			self.center_Pos2 = int((self.left_Pos2+self.right_Pos2)/2)
-
-			self.center = int((self.center_Pos1+self.center_Pos2)/2)
-		except:
-			center = None
-			pass
-
-		self.find_line_ctrl(self.center, 320)
-		self.pause()
-
 
 	def servo_move(ID, Dir, errorInput):
 		if ID == 12:
@@ -342,10 +265,6 @@ class CVThread(threading.Thread):
 				self.CVThreading = 1
 				self.find_color(self.imgCV)
 				self.CVThreading = 0
-			elif self.CVMode == 'findlineCV':
-				self.CVThreading = 1
-				self.find_line_cv(self.imgCV)
-				self.CVThreading = 0
 			elif self.CVMode == 'watchDog':
 				self.CVThreading = 1
 				self.watch_dog(self.imgCV)
@@ -356,7 +275,6 @@ class CVThread(threading.Thread):
 class Camera(BaseCamera):
 	video_source = 0
 	modeSelect = 'none'
-	# modeSelect = 'findlineCV'
 	# modeSelect = 'findColor'
 	# modeSelect = 'watchDog'
 
@@ -409,10 +327,6 @@ class Camera(BaseCamera):
 	def line_pos_set_2(self, invar):
 		global linePos_2
 		linePos_2 = invar
-
-	def color_set(self, invar):
-		global lineColorSet
-		lineColorSet = invar
 
 	def rander_set(self, invar):
 		global frameRender
@@ -485,3 +399,24 @@ class Camera(BaseCamera):
 			if not ret:
 				continue
 			yield jpeg.tobytes()
+
+
+	"""
+	def in_center(self, posInput, setCenter):
+		# Make the bot move left/right will the center line at posInput
+		# is in center, executed like:
+		# self.in_center(self.center, 320)
+		if posInput and setCenter:
+			if posInput > (setCenter + findLineError):
+				servo.move.command('right')
+				logger.info('CVThread: findLineCtrl right')
+				pass
+			elif posInput < (setCenter - findLineError):
+				servo.move.command('left')
+				logger.info('CVThread: findLineCtrl left')
+				pass
+			else:
+				servo.move.command('forward')
+				time.sleep(1)
+				pass
+	"""

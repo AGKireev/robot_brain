@@ -1,7 +1,6 @@
 import time
 import threading
 import logging
-from mpu6050 import mpu6050
 
 from servo import base
 from system.kalman_filter import KalmanFilter
@@ -78,15 +77,10 @@ Y_pid.SetKi(D)
 kalman_filter_X = KalmanFilter(0.001, 0.1)
 kalman_filter_Y = KalmanFilter(0.001, 0.1)
 
-try:
-    sensor = mpu6050(0x68)
-    mpu6050_connection = 1
-except:
-    mpu6050_connection = 0
-
 target_X = 0
 target_Y = 0
 
+# TODO: Switch to using servo from the Commander!
 # Create a servo control instance. This replaces direct Adafruit_PCA9685 usage.
 sc = base.ServoCtrl()
 
@@ -933,39 +927,39 @@ def steady_X():
         sc.set_servo_pwm(8, pwm8)
         sc.set_servo_pwm(6, pwm6 + steady_X_set)
 
-def steady():
+def steady(mpu_sensor):
     logger.info("move: steady()")
     global X_fix_output, Y_fix_output
-    if mpu6050_connection:
-        accelerometer_data = sensor.get_accel_data()
-        X = accelerometer_data['x']
-        X = kalman_filter_X.kalman(X)
-        Y = accelerometer_data['y']
-        Y = kalman_filter_Y.kalman(Y)
 
-        X_fix_output += -X_pid.GenOut(X - target_X)
-        X_fix_output = ctrl_range(X_fix_output, steady_range_Max, -steady_range_Max)
+    accelerometer_data = mpu_sensor.get_accel_data()
+    X = accelerometer_data['x']
+    X = kalman_filter_X.kalman(X)
+    Y = accelerometer_data['y']
+    Y = kalman_filter_Y.kalman(Y)
 
-        Y_fix_output += -Y_pid.GenOut(Y - target_Y)
-        Y_fix_output = ctrl_range(Y_fix_output, steady_range_Max, -steady_range_Max)
+    X_fix_output += -X_pid.GenOut(X - target_X)
+    X_fix_output = ctrl_range(X_fix_output, steady_range_Max, -steady_range_Max)
 
-        left_I_input = ctrl_range((X_fix_output + Y_fix_output), steady_range_Max, steady_range_Min)
-        left_I(0, 35, left_I_input)
+    Y_fix_output += -Y_pid.GenOut(Y - target_Y)
+    Y_fix_output = ctrl_range(Y_fix_output, steady_range_Max, -steady_range_Max)
 
-        left_II_input = ctrl_range((abs(X_fix_output * 0.5) + Y_fix_output), steady_range_Max, steady_range_Min)
-        left_II(0, 35, left_II_input)
+    left_I_input = ctrl_range((X_fix_output + Y_fix_output), steady_range_Max, steady_range_Min)
+    left_I(0, 35, left_I_input)
 
-        left_III_input = ctrl_range((-X_fix_output + Y_fix_output), steady_range_Max, steady_range_Min)
-        left_III(0, 35, left_III_input)
+    left_II_input = ctrl_range((abs(X_fix_output * 0.5) + Y_fix_output), steady_range_Max, steady_range_Min)
+    left_II(0, 35, left_II_input)
 
-        right_III_input = ctrl_range((X_fix_output - Y_fix_output), steady_range_Max, steady_range_Min)
-        right_III(0, 35, right_III_input)
+    left_III_input = ctrl_range((-X_fix_output + Y_fix_output), steady_range_Max, steady_range_Min)
+    left_III(0, 35, left_III_input)
 
-        right_II_input = ctrl_range((abs(-X_fix_output * 0.5) - Y_fix_output), steady_range_Max, steady_range_Min)
-        right_II(0, 35, right_II_input)
+    right_III_input = ctrl_range((X_fix_output - Y_fix_output), steady_range_Max, steady_range_Min)
+    right_III(0, 35, right_III_input)
 
-        right_I_input = ctrl_range((-X_fix_output - Y_fix_output), steady_range_Max, steady_range_Min)
-        right_I(0, 35, right_I_input)
+    right_II_input = ctrl_range((abs(-X_fix_output * 0.5) - Y_fix_output), steady_range_Max, steady_range_Min)
+    right_II(0, 35, right_II_input)
+
+    right_I_input = ctrl_range((-X_fix_output - Y_fix_output), steady_range_Max, steady_range_Min)
+    right_I(0, 35, right_I_input)
 
 
 def steadyTest():
