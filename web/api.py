@@ -85,31 +85,36 @@ class WebApi:
         async def websocket_endpoint(websocket: WebSocket):
             await websocket.accept()
             client_ip = websocket.client.host
-            try:
-                client_auth = await websocket.receive_text()
-                if client_auth != API_AUTHORIZATION:
-                    logger.warning(f"WebSocket, unauthorized access attempt from {client_ip}")
-                    await websocket.send_text("Unauthorized")
-                    await websocket.close(code=1008)
-                    return
-                logger.info(f"WebSocket connection authorized from {client_ip}")
-                await websocket.send_text("Connected to robot control server")
-            except Exception as e:
-                logger.error(f"WebSocket error with client {client_ip}: {e}")
-                await websocket.close()
+            logger.info(f"connection open from {client_ip}")
 
             try:
+                # Authentication phase
+                try:
+                    client_auth = await websocket.receive_text()
+                    if client_auth != API_AUTHORIZATION:
+                        logger.warning(f"WebSocket unauthorized access attempt from {client_ip}")
+                        await websocket.send_text("sorry")
+                        return
+                    logger.info(f"WebSocket connection authorized from {client_ip}")
+                    await websocket.send_text("congratulation")
+                except WebSocketDisconnect:
+                    logger.info(f"Client {client_ip} disconnected during authentication")
+                    return
+
+                # Main communication loop
                 while True:
                     try:
                         data = await websocket.receive_text()
                         command_response = await run_in_threadpool(self.commander.process, data)
                         await websocket.send_text(json.dumps(command_response))
                     except WebSocketDisconnect:
-                        logger.info("WebSocket disconnected")
-                        break
+                        logger.info(f"Client {client_ip} disconnected")
+                        return
                     except Exception as e:
-                        logger.error(f"Unexpected WebSocket error: {e}")
-                        await websocket.close()
+                        logger.error(f"Error processing command from {client_ip}: {e}")
+                        return
+
             except Exception as e:
-                logger.error(f"Error: {e}")
-                await websocket.close()
+                logger.error(f"Unexpected error with client {client_ip}: {e}")
+            finally:
+                logger.info(f"Connection closed with {client_ip}")
