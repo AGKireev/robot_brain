@@ -11,6 +11,7 @@ import logging
 from picamera2 import Picamera2
 
 import servo
+from servo.base import ServoCtrl
 # from light.strip import LightStrip
 from camera.base import BaseCamera
 from system.kalman_filter import KalmanFilter
@@ -56,7 +57,7 @@ class CVThread(threading.Thread):
 	tor = 27
 
 	# TODO: MUST be inited from webServer and passed!
-	scGear = servo.base.ServoCtrl()
+	scGear = ServoCtrl()
 	scGear.move_init()
 	# Single LED switches, not used now
 	# switch.switchSetup()
