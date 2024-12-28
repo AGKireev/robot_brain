@@ -294,29 +294,38 @@ class RobotMovement:
         
         if command_input == 'forward':
             self.direction_command = 'forward'
+            self.move_stu = 1
             self._thread_event.set()
             
         elif command_input == 'backward':
             self.direction_command = 'backward'
+            self.move_stu = 1
             self._thread_event.set()
             
         elif command_input == 'left':
             self.turn_command = 'left'
+            self.move_stu = 1
             self._thread_event.set()
             
         elif command_input == 'right':
             self.turn_command = 'right'
+            self.move_stu = 1
             self._thread_event.set()
             
         elif command_input == 'stand':
             self.direction_command = 'stand'
+            self.move_stu = 0
             self.stand()
             self._thread_event.clear()
             self.step_set = 1
             
         elif command_input == 'no':
             self.turn_command = 'no'
+            self.move_stu = 0
+            # Complete current step before stopping
+            time.sleep(0.1)  # Allow current movement to complete
             self._thread_event.clear()
+            self.stand()  # Return to neutral position
             
         elif command_input == 'automatic':
             self.smooth_mode = 1
@@ -325,7 +334,9 @@ class RobotMovement:
         elif command_input == 'automaticOff':
             self.smooth_mode = 0
             self.steady_mode = 0
+            self.move_stu = 0
             self._thread_event.clear()
+            self.stand()  # Return to neutral position
             
         elif command_input == 'KD' or command_input == 'speech':
             self.steady_mode = 1
@@ -334,7 +345,9 @@ class RobotMovement:
         elif command_input == 'speechOff':
             self.smooth_mode = 0
             self.steady_mode = 0
+            self.move_stu = 0
             self._thread_event.clear()
+            self.stand()  # Return to neutral position
 
     def stand(self):
         """Make the robot stand (neutral position)."""
@@ -363,44 +376,55 @@ class RobotMovement:
             self._thread_event.wait()
             
             if not self.steady_mode:
-                self._handle_movement()
+                if self.direction_command == 'forward' and self.turn_command == 'no':
+                    if self.smooth_mode:
+                        # Complete the full step
+                        self.dove(self.step_set, self.dove_speed, 0.001, self.dpi, 'no')
+                        self.step_set += 1
+                        if self.step_set == 5:
+                            self.step_set = 1
+                    else:
+                        self.move(self.step_set, 35, 'no')
+                        time.sleep(0.1)
+                        self.step_set += 1
+                        if self.step_set == 5:
+                            self.step_set = 1
+
+                elif self.direction_command == 'backward' and self.turn_command == 'no':
+                    if self.smooth_mode:
+                        # Complete the full step
+                        self.dove(self.step_set, -self.dove_speed, 0.001, self.dpi, 'no')
+                        self.step_set += 1
+                        if self.step_set == 5:
+                            self.step_set = 1
+                    else:
+                        self.move(self.step_set, -35, 'no')
+                        time.sleep(0.1)
+                        self.step_set += 1
+                        if self.step_set == 5:
+                            self.step_set = 1
+
+                elif self.turn_command != 'no':
+                    if self.smooth_mode:
+                        # Complete the full step
+                        self.dove(self.step_set, 35, 0.001, self.dpi, self.turn_command)
+                        self.step_set += 1
+                        if self.step_set == 5:
+                            self.step_set = 1
+                    else:
+                        self.move(self.step_set, 35, self.turn_command)
+                        time.sleep(0.1)
+                        self.step_set += 1
+                        if self.step_set == 5:
+                            self.step_set = 1
+
+                elif self.turn_command == 'no' and self.direction_command == 'stand':
+                    self.stand()
+                    self.step_set = 1
             else:
                 self._handle_steady()
             
             time.sleep(0.02)  # Prevent CPU overuse
-
-    def _handle_movement(self):
-        """Handle movement based on current commands."""
-        if self.direction_command == 'forward' and self.turn_command == 'no':
-            if self.smooth_mode:
-                self.dove(self.step_set, self.dove_speed, 0.001, self.dpi, 'no')
-            else:
-                self.move(self.step_set, 35, 'no')
-                time.sleep(0.1)
-            
-            self.step_set = (self.step_set % 4) + 1
-
-        elif self.direction_command == 'backward' and self.turn_command == 'no':
-            if self.smooth_mode:
-                self.dove(self.step_set, -self.dove_speed, 0.001, self.dpi, 'no')
-            else:
-                self.move(self.step_set, -35, 'no')
-                time.sleep(0.1)
-            
-            self.step_set = (self.step_set % 4) + 1
-
-        elif self.turn_command != 'no':
-            if self.smooth_mode:
-                self.dove(self.step_set, 35, 0.001, self.dpi, self.turn_command)
-            else:
-                self.move(self.step_set, 35, self.turn_command)
-                time.sleep(0.1)
-            
-            self.step_set = (self.step_set % 4) + 1
-
-        elif self.turn_command == 'no' and self.direction_command == 'stand':
-            self.stand()
-            self.step_set = 1
 
     def _handle_steady(self):
         """Handle steady mode movement."""
