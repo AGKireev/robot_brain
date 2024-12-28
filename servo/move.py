@@ -625,102 +625,47 @@ class RobotMovement:
         self.move_right_leg(3, 0, 35, right_iii_input)
 
     def dove(self, step_input: int, speed: int, time_last: float, dpi: int, command: str = 'no'):
-        """Execute smooth movement using dove algorithm.
-        
-        Args:
-            step_input: Current step (1-4)
-            speed: Movement speed
-            time_last: Time delay between movements
-            dpi: Smoothing factor
-            command: Movement command ('no', 'left', 'right')
-        """
-        logger.info(f"Dove movement: step={step_input}, speed={speed}, command={command}")
+        """Execute smooth movement using dove algorithm."""
+        logger.info(f"\n{'='*50}")
+        logger.info(f"DOVE MOVEMENT - Step {step_input}, Speed {speed}, Command {command}")
+        logger.info(f"{'='*50}")
         
         if speed == 0:
             return
 
         step_increment = int(speed / dpi)
         
-        for speed_i in range(0, speed + step_increment, step_increment):
+        for speed_i in range(0, (speed + step_increment), step_increment):
             speed_ii = speed_i
             speed_i = speed - speed_i
             
+            logger.info(f"\nDOVE CYCLE:")
+            logger.info(f"speed_i={speed_i}, speed_ii={speed_ii}")
+            
             if step_input == 1:
-                self._dove_step_1(speed_i, speed_ii, command, time_last, dpi)
-            elif step_input == 2:
-                self._dove_step_2(speed_i, speed_ii, command, time_last, dpi)
-            elif step_input == 3:
-                self._dove_step_3(speed_i, speed_ii, command, time_last, dpi)
-            elif step_input == 4:
-                self._dove_step_4(speed_i, speed_ii, command, time_last, dpi)
+                logger.info("\nSTEP 1 - Initial Lift")
+                if command == 'no':
+                    # First tripod
+                    logger.info("FIRST TRIPOD:")
+                    self._dove_left_leg(0, -speed_i, 3 * speed_ii)   # Left I
+                    self._dove_right_leg(1, -speed_i, 3 * speed_ii)  # Right II 
+                    self._dove_left_leg(2, -speed_i, 3 * speed_ii)   # Left III
 
-    def _dove_step_1(self, speed_i: int, speed_ii: int, command: str, time_last: float, dpi: int):
-        """Execute first step of dove movement."""
-        if command == 'no':
-            self._dove_legs_group1(-speed_i, 3 * speed_ii)
-            self._dove_legs_group2(speed_i, -10)
-        elif command == 'left':
-            self._dove_legs_group1_left(speed_i, 3 * speed_ii)
-            self._dove_legs_group2_left(speed_i, -10)
-        elif command == 'right':
-            self._dove_legs_group1_right(-speed_i, 3 * speed_ii)
-            self._dove_legs_group2_right(-speed_i, -10)
-        time.sleep(time_last / dpi)
-
-    def _dove_step_2(self, speed_i: int, speed_ii: int, command: str, time_last: float, dpi: int):
-        """Execute second step of dove movement."""
-        if command == 'no':
-            self._dove_legs_group1(speed_ii, 3 * (speed_i - speed_ii))
-            self._dove_legs_group2(-speed_ii, -10)
-        elif command == 'left':
-            self._dove_legs_group1_left(-speed_ii, 3 * (speed_i - speed_ii))
-            self._dove_legs_group2_left(speed_ii, -10)
-        elif command == 'right':
-            self._dove_legs_group1_right(speed_ii, 3 * (speed_i - speed_ii))
-            self._dove_legs_group2_right(-speed_ii, -10)
-        time.sleep(time_last / dpi)
-
-    def _dove_step_3(self, speed_i: int, speed_ii: int, command: str, time_last: float, dpi: int):
-        """Execute third step of dove movement."""
-        if command == 'no':
-            self._dove_legs_group1(speed_i, -10)
-            self._dove_legs_group2(-speed_i, 3 * speed_ii)
-        elif command == 'left':
-            self._dove_legs_group1_left(-speed_i, -10)
-            self._dove_legs_group2_left(speed_i, 3 * speed_ii)
-        elif command == 'right':
-            self._dove_legs_group1_right(speed_i, -10)
-            self._dove_legs_group2_right(speed_i, 3 * speed_ii)
-        time.sleep(time_last / dpi)
-
-    def _dove_step_4(self, speed_i: int, speed_ii: int, command: str, time_last: float, dpi: int):
-        """Execute fourth step of dove movement."""
-        if command == 'no':
-            self._dove_legs_group1(-speed_ii, -10)
-            self._dove_legs_group2(speed_ii, 3 * (speed_i - speed_ii))
-        elif command == 'left':
-            self._dove_legs_group1_left(speed_ii, -10)
-            self._dove_legs_group2_left(-speed_ii, 3 * (speed_i - speed_ii))
-        elif command == 'right':
-            self._dove_legs_group1_right(-speed_ii, -10)
-            self._dove_legs_group2_right(speed_ii, 3 * (speed_i - speed_ii))
-        time.sleep(time_last / dpi)
-
-    def _dove_legs_group1(self, horizontal: int, vertical: int):
-        """Move first group of legs in dove movement."""
-        self._dove_left_leg(0, horizontal, vertical)   # Left I
-        self._dove_right_leg(1, horizontal, vertical)  # Right II
-        self._dove_left_leg(2, horizontal, vertical)   # Left III
-
-    def _dove_legs_group2(self, horizontal: int, vertical: int):
-        """Move second group of legs in dove movement."""
-        self._dove_right_leg(0, horizontal, vertical)  # Right I
-        self._dove_left_leg(1, horizontal, vertical)   # Left II
-        self._dove_right_leg(2, horizontal, vertical)  # Right III
+                    # Second tripod
+                    logger.info("SECOND TRIPOD:")
+                    self._dove_right_leg(0, speed_i, -10)  # Right I
+                    self._dove_left_leg(1, speed_i, -10)   # Left II
+                    self._dove_right_leg(2, speed_i, -10)  # Right III
+                
+                time.sleep(time_last / dpi)
 
     def _dove_left_leg(self, leg_num: int, horizontal: int, vertical: int):
         """Move a left leg in dove movement."""
         servo_base = leg_num * 2
+        logger.info(f"\nDOVE LEFT LEG {leg_num+1}:")
+        logger.info(f"Horizontal servo {servo_base}: {self.pwm_values[servo_base]} -> {self.pwm_values[servo_base] + horizontal}")
+        logger.info(f"Vertical servo {servo_base+1}: {self.pwm_values[servo_base+1]} -> {self.pwm_values[servo_base+1] + vertical}")
+        
         if self.left_side_direction:
             self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + horizontal)
         else:
@@ -734,6 +679,10 @@ class RobotMovement:
     def _dove_right_leg(self, leg_num: int, horizontal: int, vertical: int):
         """Move a right leg in dove movement."""
         servo_base = 6 + leg_num * 2
+        logger.info(f"\nDOVE RIGHT LEG {leg_num+1}:")
+        logger.info(f"Horizontal servo {servo_base}: {self.pwm_values[servo_base]} -> {self.pwm_values[servo_base] + horizontal}")
+        logger.info(f"Vertical servo {servo_base+1}: {self.pwm_values[servo_base+1]} -> {self.pwm_values[servo_base+1] + vertical}")
+        
         if self.right_side_direction:
             self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + horizontal)
         else:
@@ -743,30 +692,6 @@ class RobotMovement:
             self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + vertical)
         else:
             self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - vertical)
-
-    def _dove_legs_group1_left(self, horizontal: int, vertical: int):
-        """Move first group of legs in left turn dove movement."""
-        self._dove_left_leg(0, horizontal, vertical)   # Left I
-        self._dove_right_leg(1, -horizontal, vertical)  # Right II
-        self._dove_left_leg(2, horizontal, vertical)   # Left III
-
-    def _dove_legs_group2_left(self, horizontal: int, vertical: int):
-        """Move second group of legs in left turn dove movement."""
-        self._dove_right_leg(0, horizontal, vertical)  # Right I
-        self._dove_left_leg(1, -horizontal, vertical)  # Left II
-        self._dove_right_leg(2, horizontal, vertical)  # Right III
-
-    def _dove_legs_group1_right(self, horizontal: int, vertical: int):
-        """Move first group of legs in right turn dove movement."""
-        self._dove_left_leg(0, -horizontal, vertical)   # Left I
-        self._dove_right_leg(1, horizontal, vertical)  # Right II
-        self._dove_left_leg(2, -horizontal, vertical)   # Left III
-
-    def _dove_legs_group2_right(self, horizontal: int, vertical: int):
-        """Move second group of legs in right turn dove movement."""
-        self._dove_right_leg(0, -horizontal, vertical)  # Right I
-        self._dove_left_leg(1, horizontal, vertical)  # Left II
-        self._dove_right_leg(2, -horizontal, vertical)  # Right III
 
     def _ctrl_range(self, raw: float, max_val: float, min_val: float) -> int:
         """Control the range of raw values.
