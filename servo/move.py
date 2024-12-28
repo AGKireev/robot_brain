@@ -66,7 +66,17 @@ class RobotMovement:
         # Initialize threading
         self._thread_event = threading.Event()
         self._movement_thread = None
+        
+        # Start thread only after everything is initialized
         self._start_movement_thread()
+
+        # Add missing variables so that steady mode & turning logic matches move_old.py
+        self.steady_range_min = -40
+        self.steady_range_max = 130
+        self.range_mid = (self.steady_range_min + self.steady_range_max) / 2
+        self.x_fix_output = self.range_mid
+        self.y_fix_output = self.range_mid
+        self.steady_x_set = 73  # matches old "steady_X_set"
 
     def _init_pid_controllers(self):
         """Initialize PID controllers and Kalman filters for stabilization."""
@@ -285,11 +295,7 @@ class RobotMovement:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
 
     def command(self, command_input: str):
-        """Process movement commands.
-        
-        Args:
-            command_input: Command to execute
-        """
+        """Process movement commands exactly like old move.command()"""
         logger.info(f"Processing command: {command_input}")
         
         if command_input == 'forward':
@@ -314,45 +320,23 @@ class RobotMovement:
             
         elif command_input == 'stand':
             self.direction_command = 'stand'
+            self.turn_command = 'no'  # Critical: Reset turn command
             self.move_stu = 0
-            self.stand()
             self._thread_event.clear()
+            self.stand()
             self.step_set = 1
             
         elif command_input == 'no':
             self.turn_command = 'no'
-            self.move_stu = 0
-            # Complete current step before stopping
-            time.sleep(0.1)  # Allow current movement to complete
-            self._thread_event.clear()
-            self.stand()  # Return to neutral position
-            
-        elif command_input == 'automatic':
-            self.smooth_mode = 1
-            self._thread_event.set()
-            
-        elif command_input == 'automaticOff':
-            self.smooth_mode = 0
-            self.steady_mode = 0
+            self.direction_command = 'no'  # Critical: Reset direction too
             self.move_stu = 0
             self._thread_event.clear()
-            self.stand()  # Return to neutral position
-            
-        elif command_input == 'KD' or command_input == 'speech':
-            self.steady_mode = 1
-            self._thread_event.set()
-            
-        elif command_input == 'speechOff':
-            self.smooth_mode = 0
-            self.steady_mode = 0
-            self.move_stu = 0
-            self._thread_event.clear()
-            self.stand()  # Return to neutral position
+            self.stand()
 
     def stand(self):
-        """Make the robot stand (neutral position)."""
-        logger.info("Standing")
-        for i in range(12):  # Only the leg servos
+        """Make robot stand - CRITICAL: Set ALL servos to neutral"""
+        logger.info("Standing - setting all servos to neutral")
+        for i in range(16):  # Set ALL servos including camera
             self.sc.set_servo_pwm(i, 300)
 
     def cleanup(self):
@@ -371,58 +355,50 @@ class RobotMovement:
         self._movement_thread.start()
 
     def _movement_loop(self):
-        """Main movement control loop."""
+        """Main movement control loop - match old move_thread() exactly"""
         while True:
             self._thread_event.wait()
             
             if not self.steady_mode:
                 if self.direction_command == 'forward' and self.turn_command == 'no':
                     if self.smooth_mode:
-                        # Complete the full step
                         self.dove(self.step_set, self.dove_speed, 0.001, self.dpi, 'no')
-                        self.step_set += 1
-                        if self.step_set == 5:
-                            self.step_set = 1
                     else:
                         self.move(self.step_set, 35, 'no')
                         time.sleep(0.1)
-                        self.step_set += 1
-                        if self.step_set == 5:
-                            self.step_set = 1
+                    
+                    self.step_set += 1
+                    if self.step_set == 5:
+                        self.step_set = 1
 
                 elif self.direction_command == 'backward' and self.turn_command == 'no':
                     if self.smooth_mode:
-                        # Complete the full step
                         self.dove(self.step_set, -self.dove_speed, 0.001, self.dpi, 'no')
-                        self.step_set += 1
-                        if self.step_set == 5:
-                            self.step_set = 1
                     else:
                         self.move(self.step_set, -35, 'no')
                         time.sleep(0.1)
-                        self.step_set += 1
-                        if self.step_set == 5:
-                            self.step_set = 1
+                    
+                    self.step_set += 1
+                    if self.step_set == 5:
+                        self.step_set = 1
 
                 elif self.turn_command != 'no':
                     if self.smooth_mode:
-                        # Complete the full step
                         self.dove(self.step_set, 35, 0.001, self.dpi, self.turn_command)
-                        self.step_set += 1
-                        if self.step_set == 5:
-                            self.step_set = 1
                     else:
                         self.move(self.step_set, 35, self.turn_command)
                         time.sleep(0.1)
-                        self.step_set += 1
-                        if self.step_set == 5:
-                            self.step_set = 1
+                    
+                    self.step_set += 1
+                    if self.step_set == 5:
+                        self.step_set = 1
 
-                elif self.turn_command == 'no' and self.direction_command == 'stand':
+                elif self.direction_command == 'stand':
                     self.stand()
                     self.step_set = 1
             else:
-                self._handle_steady()
+                self._steady_x()
+                self.steady()
             
             time.sleep(0.02)  # Prevent CPU overuse
 

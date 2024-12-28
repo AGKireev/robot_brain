@@ -127,16 +127,20 @@ class Commander:
             return {"status": "error", "message": f"Command execution failed: {str(e)}"}
 
     def _handle_movement(self, direction: str):
-        """Handle movement commands (forward, backward, stand)."""
+        """Handle movement commands (forward, backward, stand)"""
         valid_directions = {"forward", "backward", "stand"}
         if direction not in valid_directions:
             raise ValueError(f"Invalid movement direction: {direction}")
         
+        # Always reset turn command when changing direction
+        self.turn_command = "no"
         self.direction_command = direction
-        self.movement.command(self.direction_command)
+        self.movement.command(direction)
 
     def _handle_turn(self, direction: str):
-        """Handle turning commands (left, right, no)."""
+        """Handle turning commands (left, right, no)"""
+        # Always reset direction command when turning
+        self.direction_command = "no" 
         self.turn_command = "no" if direction == "turn_stop" else direction
         self.movement.command(self.turn_command)
 
