@@ -158,13 +158,15 @@ class RobotMovement:
 
     def move_left_leg(self, leg_num: int, pos: int, wiggle: int, height_adjust: int = 0):
         """
-        Replicate old move_old.py logic for left legs.
-        No special "horizontal_direction" or "abs(wiggle)" usage:
-        just add/subtract 'wiggle' exactly as the old code did.
+        Replicate old move_old.py logic exactly.
+        The vertical servo (pos == 1 or 3) always uses ±height_change,
+        ignoring whether wiggle is positive/negative. That’s how
+        the old code kept up/down consistent for forward/backward.
         """
         servo_base = (leg_num - 1) * 2
+        
+        # If pos == 0, same as old code: optional small height_adjust
         if pos == 0:
-            # same as old code
             if self.left_side_height:
                 self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + height_adjust)
             else:
@@ -172,53 +174,80 @@ class RobotMovement:
             return
 
         if self.left_side_direction:
+            # --------------------
+            # If left_side_direction == 1
+            # --------------------
             if pos == 1:
-                # old code: sc.set_servo_pwm(servo_base, pwm_base)
+                # LIKE OLD CODE: servo_base stays at initial, servo_base+1 goes up by 3 * height_change
                 self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + 3 * self.height_change)
+                    self.sc.set_servo_pwm(
+                        servo_base + 1, 
+                        self.pwm_values[servo_base + 1] + 3 * self.height_change
+                    )
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - 3 * self.height_change)
+                    self.sc.set_servo_pwm(
+                        servo_base + 1, 
+                        self.pwm_values[servo_base + 1] - 3 * self.height_change
+                    )
+
             elif pos == 2:
-                # old code: sc.set_servo_pwm(servo_base, pwm_base + wiggle)
+                # horizontal movement uses wiggle
                 self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + wiggle)
                 if self.left_side_height:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
                 else:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+
             elif pos == 3:
+                # leg back down, ignoring wiggle for vertical
                 self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
                 if self.left_side_height:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
                 else:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+
             elif pos == 4:
-                # old code: sc.set_servo_pwm(servo_base, pwm_base - wiggle)
+                # horizontal servo moves back (±wiggle)
                 self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] - wiggle)
                 if self.left_side_height:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
                 else:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+
         else:
-            # old code's "else" branch for leftSide_direction == 0
+            # --------------------
+            # If left_side_direction == 0
+            # IMPORTANT: this also still uses FIXED 3 * self.height_change for pos == 1
+            # instead of 3 * wiggle.
+            # --------------------
             if pos == 1:
                 self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + 3 * wiggle)
+                    self.sc.set_servo_pwm(
+                        servo_base + 1, 
+                        self.pwm_values[servo_base + 1] + 3 * self.height_change
+                    )
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - 3 * wiggle)
+                    self.sc.set_servo_pwm(
+                        servo_base + 1, 
+                        self.pwm_values[servo_base + 1] - 3 * self.height_change
+                    )
+
             elif pos == 2:
                 self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] - wiggle)
                 if self.left_side_height:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - wiggle)
                 else:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
+
             elif pos == 3:
                 self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
                 if self.left_side_height:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - wiggle)
                 else:
                     self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
+
             elif pos == 4:
                 self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + wiggle)
                 if self.left_side_height:
