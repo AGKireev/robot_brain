@@ -105,220 +105,318 @@ class RobotMovement:
         self.target_y = 0
 
     def move(self, step_input: int, speed: int, command: str):
-        """Execute movement pattern.
+        """Execute movement pattern with detailed logging."""
+        logger.info(f"\nMOVEMENT STEP {step_input}")
+        logger.info(f"Speed: {speed} ({'-' if speed < 0 else '+'})")
+        logger.info(f"Command: {command}")
         
-        Args:
-            step_input: Current step (1-4)
-            speed: Movement speed
-            command: Movement command ('no', 'left', 'right')
-        """
-        logger.info(f"Moving: step={step_input}, speed={speed}, command={command}")
-        
-        # Calculate steps for tripod gait
         step_i = step_input
         step_ii = step_input + 2
         if step_ii > 4:
             step_ii = step_ii - 4
-            
+        
         if speed == 0:
+            logger.info("Zero speed - no movement")
             return
-            
-        if command == 'no':  # Forward/backward
-            # First tripod
+        
+        if command == 'no':
+            logger.info("\nFIRST TRIPOD:")
             self.move_right_leg(1, step_i, speed)
             self.move_left_leg(2, step_i, speed)
             self.move_right_leg(3, step_i, speed)
             
-            # Second tripod
+            logger.info("\nSECOND TRIPOD:")
             self.move_left_leg(1, step_ii, speed)
             self.move_right_leg(2, step_ii, speed)
             self.move_left_leg(3, step_ii, speed)
-            
+        
         elif command == 'left':
-            # First tripod with inverted speeds
+            logger.info("\nFIRST TRIPOD WITH INVERTED SPEEDS:")
             self.move_right_leg(1, step_i, speed)
             self.move_left_leg(2, step_i, -speed)
             self.move_right_leg(3, step_i, speed)
             
-            # Second tripod with inverted speeds
+            logger.info("\nSECOND TRIPOD WITH INVERTED SPEEDS:")
             self.move_left_leg(1, step_ii, -speed)
             self.move_right_leg(2, step_ii, speed)
             self.move_left_leg(3, step_ii, -speed)
-            
+        
         elif command == 'right':
-            # First tripod with inverted speeds
+            logger.info("\nFIRST TRIPOD WITH INVERTED SPEEDS:")
             self.move_right_leg(1, step_i, -speed)
             self.move_left_leg(2, step_i, speed)
             self.move_right_leg(3, step_i, -speed)
             
-            # Second tripod with inverted speeds
+            logger.info("\nSECOND TRIPOD WITH INVERTED SPEEDS:")
             self.move_left_leg(1, step_ii, speed)
             self.move_right_leg(2, step_ii, -speed)
             self.move_left_leg(3, step_ii, speed)
 
     def move_left_leg(self, leg_num: int, pos: int, wiggle: int, height_adjust: int = 0):
-        """
-        Replicate old move_old.py logic exactly.
-        The vertical servo (pos == 1 or 3) always uses ±height_change,
-        ignoring whether wiggle is positive/negative. That’s how
-        the old code kept up/down consistent for forward/backward.
-        """
+        """Move a left leg with detailed logging of every servo movement."""
         servo_base = (leg_num - 1) * 2
+        logger.info(f"LEFT LEG {leg_num}:")
+        logger.info(f"  Position: {pos}, Wiggle: {wiggle}, Height Adjust: {height_adjust}")
+        logger.info(f"  Servo base: {servo_base} (horizontal) and {servo_base + 1} (vertical)")
+        logger.info(f"  Current PWM values: horizontal={self.pwm_values[servo_base]}, vertical={self.pwm_values[servo_base + 1]}")
         
-        # If pos == 0, same as old code: optional small height_adjust
         if pos == 0:
             if self.left_side_height:
-                self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + height_adjust)
+                new_pwm = self.pwm_values[servo_base + 1] + height_adjust
+                logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (height adjust)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
             else:
-                self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - height_adjust)
+                new_pwm = self.pwm_values[servo_base + 1] - height_adjust
+                logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (height adjust)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
             return
 
         if self.left_side_direction:
-            # --------------------
-            # If left_side_direction == 1
-            # --------------------
-            if pos == 1:
-                # LIKE OLD CODE: servo_base stays at initial, servo_base+1 goes up by 3 * height_change
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
+            if pos == 1:  # Lift leg
+                logger.info("  STEP 1: Lifting leg")
+                new_pwm = self.pwm_values[servo_base]
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (neutral)")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(
-                        servo_base + 1, 
-                        self.pwm_values[servo_base + 1] + 3 * self.height_change
-                    )
+                    new_pwm = self.pwm_values[servo_base + 1] + 3 * self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lift up)")
                 else:
-                    self.sc.set_servo_pwm(
-                        servo_base + 1, 
-                        self.pwm_values[servo_base + 1] - 3 * self.height_change
-                    )
+                    new_pwm = self.pwm_values[servo_base + 1] - 3 * self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lift up)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
-            elif pos == 2:
-                # horizontal movement uses wiggle
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + wiggle)
+            elif pos == 2:  # Move leg horizontally while lifted
+                logger.info("  STEP 2: Moving leg horizontally while lifted")
+                new_pwm = self.pwm_values[servo_base] + wiggle
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (move {wiggle:+})")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] - self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (partial lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] + self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (partial lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
             elif pos == 3:
-                # leg back down, ignoring wiggle for vertical
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
+                logger.info("  STEP 3: Leg back down, ignoring wiggle for vertical")
+                new_pwm = self.pwm_values[servo_base]
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (neutral)")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] - self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] + self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
             elif pos == 4:
-                # horizontal servo moves back (±wiggle)
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] - wiggle)
+                logger.info("  STEP 4: Horizontal servo moves back (±wiggle)")
+                new_pwm = self.pwm_values[servo_base] - wiggle
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (move {wiggle:-})")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] - self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] + self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
         else:
-            # --------------------
-            # If left_side_direction == 0
-            # IMPORTANT: this also still uses FIXED 3 * self.height_change for pos == 1
-            # instead of 3 * wiggle.
-            # --------------------
             if pos == 1:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
+                logger.info("  STEP 1: Lifting leg")
+                new_pwm = self.pwm_values[servo_base]
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (neutral)")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(
-                        servo_base + 1, 
-                        self.pwm_values[servo_base + 1] + 3 * self.height_change
-                    )
+                    new_pwm = self.pwm_values[servo_base + 1] + 3 * wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lift up)")
                 else:
-                    self.sc.set_servo_pwm(
-                        servo_base + 1, 
-                        self.pwm_values[servo_base + 1] - 3 * self.height_change
-                    )
+                    new_pwm = self.pwm_values[servo_base + 1] - 3 * wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lift up)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
             elif pos == 2:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] - wiggle)
+                logger.info("  STEP 2: Moving leg horizontally while lifted")
+                new_pwm = self.pwm_values[servo_base] + wiggle
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (move {wiggle:+})")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] - wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (partial lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] + wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (partial lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
             elif pos == 3:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
+                logger.info("  STEP 3: Leg back down, ignoring wiggle for vertical")
+                new_pwm = self.pwm_values[servo_base]
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (neutral)")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] - wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] + wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
             elif pos == 4:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + wiggle)
+                logger.info("  STEP 4: Horizontal servo moves back (±wiggle)")
+                new_pwm = self.pwm_values[servo_base] + wiggle
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (move {wiggle:+})")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.left_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] - wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] + wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
     def move_right_leg(self, leg_num: int, pos: int, wiggle: int, height_adjust: int = 0):
-        """
-        Replicate old move_old.py logic for right legs.
-        Again, just do +wiggle or -wiggle exactly as the old code, ignoring sign checks.
-        """
+        """Move a right leg with detailed logging of every servo movement."""
         servo_base = (leg_num - 1) * 2 + 6
-
+        logger.info(f"RIGHT LEG {leg_num}:")
+        logger.info(f"  Position: {pos}, Wiggle: {wiggle}, Height Adjust: {height_adjust}")
+        logger.info(f"  Servo base: {servo_base} (horizontal) and {servo_base + 1} (vertical)")
+        logger.info(f"  Current PWM values: horizontal={self.pwm_values[servo_base]}, vertical={self.pwm_values[servo_base + 1]}")
+        
         if pos == 0:
             if self.right_side_height:
-                self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + height_adjust)
+                new_pwm = self.pwm_values[servo_base + 1] + height_adjust
+                logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (height adjust)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
             else:
-                self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - height_adjust)
+                new_pwm = self.pwm_values[servo_base + 1] - height_adjust
+                logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (height adjust)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
             return
 
         if self.right_side_direction:
             if pos == 1:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
+                logger.info("  STEP 1: Lifting leg")
+                new_pwm = self.pwm_values[servo_base]
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (neutral)")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.right_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + 3 * self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] + 3 * self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lift up)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - 3 * self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] - 3 * self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lift up)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
+
             elif pos == 2:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + wiggle)
+                logger.info("  STEP 2: Moving leg horizontally while lifted")
+                new_pwm = self.pwm_values[servo_base] + wiggle
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (move {wiggle:+})")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.right_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] - self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (partial lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] + self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (partial lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
+
             elif pos == 3:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
+                logger.info("  STEP 3: Leg back down, ignoring wiggle for vertical")
+                new_pwm = self.pwm_values[servo_base]
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (neutral)")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.right_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] - self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] + self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
+
             elif pos == 4:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] - wiggle)
+                logger.info("  STEP 4: Horizontal servo moves back (±wiggle)")
+                new_pwm = self.pwm_values[servo_base] - wiggle
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (move {wiggle:-})")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.right_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] - self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + self.height_change)
+                    new_pwm = self.pwm_values[servo_base + 1] + self.height_change
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
+
         else:
             if pos == 1:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
+                logger.info("  STEP 1: Lifting leg")
+                new_pwm = self.pwm_values[servo_base]
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (neutral)")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.right_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + 3 * wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] + 3 * wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lift up)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - 3 * wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] - 3 * wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lift up)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
+
             elif pos == 2:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] - wiggle)
+                logger.info("  STEP 2: Moving leg horizontally while lifted")
+                new_pwm = self.pwm_values[servo_base] + wiggle
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (move {wiggle:+})")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.right_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] - wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (partial lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] + wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (partial lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
+
             elif pos == 3:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base])
+                logger.info("  STEP 3: Leg back down, ignoring wiggle for vertical")
+                new_pwm = self.pwm_values[servo_base]
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (neutral)")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.right_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] - wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] + wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
+
             elif pos == 4:
-                self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + wiggle)
+                logger.info("  STEP 4: Horizontal servo moves back (±wiggle)")
+                new_pwm = self.pwm_values[servo_base] + wiggle
+                logger.info(f"  Setting horizontal servo {servo_base} to {new_pwm} (move {wiggle:+})")
+                self.sc.set_servo_pwm(servo_base, new_pwm)
+                
                 if self.right_side_height:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] - wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] - wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
                 else:
-                    self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + wiggle)
+                    new_pwm = self.pwm_values[servo_base + 1] + wiggle
+                    logger.info(f"  Setting vertical servo {servo_base + 1} to {new_pwm} (lower)")
+                self.sc.set_servo_pwm(servo_base + 1, new_pwm)
 
     def command(self, command_input: str):
         """Process movement commands exactly like old move.command()"""
