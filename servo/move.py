@@ -633,29 +633,40 @@ class RobotMovement:
         if speed == 0:
             return
 
-        step_increment = int(speed / dpi)
+        # For backward movement (negative speed), we still use positive increments
+        abs_speed = abs(speed)
+        step_increment = int(abs_speed / dpi)
         
-        for speed_i in range(0, (speed + step_increment), step_increment):
+        for speed_i in range(0, abs_speed + step_increment, step_increment):
             speed_ii = speed_i
-            speed_i = speed - speed_i
+            speed_i = abs_speed - speed_i
+            
+            # If moving backward, invert horizontal movement only
+            if speed < 0:
+                horizontal = speed_i  # Will be negative for backward
+            else:
+                horizontal = -speed_i  # Normal forward movement
+            
+            # Vertical movement should always be the same regardless of direction
+            vertical = 3 * self.height_change  # Use fixed height_change instead of speed_ii
             
             logger.info(f"\nDOVE CYCLE:")
-            logger.info(f"speed_i={speed_i}, speed_ii={speed_ii}")
+            logger.info(f"speed_i={speed_i}, horizontal={horizontal}, vertical={vertical}")
             
             if step_input == 1:
                 logger.info("\nSTEP 1 - Initial Lift")
                 if command == 'no':
-                    # First tripod
+                    # First tripod - lift and move
                     logger.info("FIRST TRIPOD:")
-                    self._dove_left_leg(0, -speed_i, 3 * speed_ii)   # Left I
-                    self._dove_right_leg(1, -speed_i, 3 * speed_ii)  # Right II 
-                    self._dove_left_leg(2, -speed_i, 3 * speed_ii)   # Left III
+                    self._dove_left_leg(0, horizontal, vertical)   # Left I
+                    self._dove_right_leg(1, horizontal, vertical)  # Right II 
+                    self._dove_left_leg(2, horizontal, vertical)   # Left III
 
-                    # Second tripod
+                    # Second tripod - stay down
                     logger.info("SECOND TRIPOD:")
-                    self._dove_right_leg(0, speed_i, -10)  # Right I
-                    self._dove_left_leg(1, speed_i, -10)   # Left II
-                    self._dove_right_leg(2, speed_i, -10)  # Right III
+                    self._dove_right_leg(0, -horizontal, -10)  # Right I
+                    self._dove_left_leg(1, -horizontal, -10)   # Left II
+                    self._dove_right_leg(2, -horizontal, -10)  # Right III
                 
                 time.sleep(time_last / dpi)
 
@@ -666,11 +677,13 @@ class RobotMovement:
         logger.info(f"Horizontal servo {servo_base}: {self.pwm_values[servo_base]} -> {self.pwm_values[servo_base] + horizontal}")
         logger.info(f"Vertical servo {servo_base+1}: {self.pwm_values[servo_base+1]} -> {self.pwm_values[servo_base+1] + vertical}")
         
+        # Horizontal movement - affected by direction
         if self.left_side_direction:
             self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] + horizontal)
         else:
             self.sc.set_servo_pwm(servo_base, self.pwm_values[servo_base] - horizontal)
 
+        # Vertical movement - always use height_change
         if self.left_side_height:
             self.sc.set_servo_pwm(servo_base + 1, self.pwm_values[servo_base + 1] + vertical)
         else:
