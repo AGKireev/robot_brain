@@ -32,6 +32,10 @@ class Commander:
         self.light_strip = light_strip
         self.camera = camera
 
+        # Initialize robot movement controller
+        self.movement = move.RobotMovement(self.servo_legs)
+        self.movement.set_init_positions(self.servo_legs.init_positions)
+
         # TODO: Is this correct use?
         self.init_pwms = json.loads(json.dumps(servo_legs.init_positions))
 
@@ -129,12 +133,12 @@ class Commander:
             raise ValueError(f"Invalid movement direction: {direction}")
         
         self.direction_command = direction
-        move.command(self.direction_command)
+        self.movement.command(self.direction_command)
 
     def _handle_turn(self, direction: str):
         """Handle turning commands (left, right, no)."""
         self.turn_command = "no" if direction == "turn_stop" else direction
-        move.command(self.turn_command)
+        self.movement.command(self.turn_command)
 
     def _handle_camera_look(self, direction: str):
         """Handle camera look commands."""

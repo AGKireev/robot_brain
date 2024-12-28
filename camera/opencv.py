@@ -15,6 +15,7 @@ from servo.base import ServoCtrl
 # from light.strip import LightStrip
 from camera.base import BaseCamera
 from system.kalman_filter import KalmanFilter
+from servo import move
 
 # os.environ["LIBCAMERA_LOG_LEVELS"] = "2"
 # logging.getLogger('picamera2').setLevel(logging.INFO)
@@ -99,6 +100,8 @@ class CVThread(threading.Thread):
 		self.frameDelta = None
 		self.thresh = None
 		self.cnts = None
+
+		self.movement = None  # Will be set by Camera class
 
 	def mode(self, invar, img_input):
 		self.CVMode = invar
@@ -280,7 +283,7 @@ class Camera(BaseCamera):
 	# modeSelect = 'watchDog'
 
 
-	def __init__(self):
+	def __init__(self, movement_controller=None):
 		# if os.environ.get('OPENCV_CAMERA_SOURCE'):
 		# 	Camera.set_video_source(int(os.environ['OPENCV_CAMERA_SOURCE']))
 		# super(Camera, self).__init__()
@@ -289,6 +292,22 @@ class Camera(BaseCamera):
 		# self.picam2.configure(self.picam2.create_preview_configuration(main={"size": (640, 480)}))
 		# self.picam2.start()
 
+		self.movement = movement_controller  # RobotMovement instance
+		self.modeSelect = 'none'
+
+	def set_movement_controller(self, movement_controller):
+		"""Set the movement controller instance."""
+		self.movement = movement_controller
+		# Also set it for the CV thread if it exists
+		if hasattr(self, 'thread') and self.thread:
+			self.thread.movement = movement_controller
+
+	def _handle_movement_command(self, command: str):
+		"""Handle movement commands."""
+		if self.movement:
+			self.movement.command(command)
+		else:
+			logger.warning("Movement controller not set, ignoring command")
 
 	def color_find_set(self, invarH, invarS, invarV):
 		global colorUpper, colorLower
