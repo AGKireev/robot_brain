@@ -12,7 +12,7 @@ from web.api import WebApi
 from brain.commander import Commander
 from servo.base import ServoCtrl
 from light.strip import LightStrip
-from movement import move
+from servo import move  # Changed from 'movement import move' to 'servo import move'
 # import switch  # The 3 single LEDs switches, we don't need them for now
 
 logging.basicConfig(level=logging.INFO)
