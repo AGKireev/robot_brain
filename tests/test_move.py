@@ -56,54 +56,7 @@ if __name__ == '__main__':
 
     except KeyboardInterrupt:
         # set all to safe position
-        move.cleanup()  # Use the new cleanup function
+        for i in range(16):
+            sc.set_servo_pwm(i, 300)
         time.sleep(1)
-
-
-"""
-def steadyTest():
-    logger.info("move: steadyTest()")
-    if leftSide_direction:
-        sc.set_servo_pwm(0, pwm0 +
-                         steady_X)
-        sc.set_servo_pwm(2, pwm2)
-        sc.set_servo_pwm(4, pwm4 - steady_X)
-    else:
-        sc.set_servo_pwm(0, pwm0 + steady_X)
-        sc.set_servo_pwm(2, pwm2)
-        sc.set_servo_pwm(4, pwm4 - steady_X)
-
-    if rightSide_direction:
-        sc.set_servo_pwm(10, pwm10 + steady_X)
-        sc.set_servo_pwm(8, pwm8)
-        sc.set_servo_pwm(6, pwm6 - steady_X)
-    else:
-        sc.set_servo_pwm(10, pwm10 - steady_X)
-        sc.set_servo_pwm(8, pwm8)
-        sc.set_servo_pwm(6, pwm6 + steady_X)
-
-    while 1:
-        left_H = steady_range_Min
-        right_H = steady_range_Max
-        left_I(0, 35, left_H)
-        left_II(0, 35, left_H)
-        left_III(0, 35, left_H)
-
-        right_I(0, 35, right_H)
-        right_II(0, 35, right_H)
-        right_III(0, 35, right_H)
-
-        time.sleep(1)
-
-        left_H = 130
-        right_H = -40
-        left_I(0, 35, left_H)
-        left_II(0, 35, left_H)
-        left_III(0, 35, left_H)
-
-        right_I(0, 35, right_H)
-        right_II(0, 35, right_H)
-        right_III(0, 35, right_H)
-
-        time.sleep(1)
-"""
+        # clean_all()

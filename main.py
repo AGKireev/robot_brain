@@ -12,7 +12,6 @@ from web.api import WebApi
 from brain.commander import Commander
 from servo.base import ServoCtrl
 from light.strip import LightStrip
-from servo import move  # Changed from 'movement import move' to 'servo import move'
 # import switch  # The 3 single LEDs switches, we don't need them for now
 
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +34,6 @@ class Robot:
 		self.light_strip = None
 		self.api = None
 		self.sensor = None  # MPU6050 sensor, accelerometer and gyroscope
-		self.movement = None  # Robot movement controller
 
 	def init_components(self):
 		logger.info("Robot.init_components")
@@ -66,17 +64,7 @@ class Robot:
 		logger.info("Robot.camera servo initialized")
 
 		try:
-			# Initialize movement controller first
-			self.movement = move.RobotMovement(self.servo_legs)
-			self.movement.set_init_positions(self.servo_legs.init_positions)
-		except Exception as e:
-			logger.error(f"Robot.Failed to initialize Movement Controller: {e}")
-			sys.exit(1)
-		logger.info("Robot.movement controller initialized")
-
-		try:
-			# Initialize camera with movement controller
-			self.camera = Camera(self.movement)
+			self.camera = Camera()
 		except Exception as e:
 			logger.error(f"Robot.Failed to initialize Camera: {e}")
 			sys.exit(1)
@@ -86,6 +74,8 @@ class Robot:
 			self.light_strip = LightStrip()
 			self.light_strip.start()
 			self.light_strip.stars()
+			# RL.breath(70,70,255)
+			# RL.rainbow()
 		except Exception as e:
 			logger.error(f"Robot.Failed to initialize LightStrip: {e}")
 			sys.exit(1)
@@ -115,12 +105,6 @@ class Robot:
 
 	def shutdown_components(self):
 		logger.info("Robot.shutdown_components")
-		# if self.movement:
-		# 	try:
-		# 		self.movement.cleanup()
-		# 	except Exception as e:
-		# 		logger.error(f"Robot.Error cleaning up movement controller: {e}")
-
 		if self.light_strip:
 			try:
 				self.light_strip.pause()
