@@ -155,11 +155,10 @@ class RobotMovement:
     def move_left_leg(self, leg_num: int, pos: int, wiggle: int, height_adjust: int = 0):
         """Move a left leg with detailed logging of every servo movement."""
         servo_base = (leg_num - 1) * 2
-        logger.info(f"LEFT LEG {leg_num}:")
-        logger.info(f"  Position: {pos}, Wiggle: {wiggle}, Height Adjust: {height_adjust}")
-        logger.info(f"  Servo base: {servo_base} (horizontal) and {servo_base + 1} (vertical)")
-        logger.info(f"  Current PWM values: horizontal={self.pwm_values[servo_base]}, vertical={self.pwm_values[servo_base + 1]}")
-        
+        logger.info(f"\nLEFT LEG {leg_num} (servos {servo_base}=horizontal, {servo_base+1}=vertical):")
+        logger.info(f"STEP {pos} with wiggle={wiggle}")
+        logger.info(f"Current positions: horiz={self.pwm_values[servo_base]}, vert={self.pwm_values[servo_base+1]}")
+
         if pos == 0:
             if self.left_side_height:
                 new_pwm = self.pwm_values[servo_base + 1] + height_adjust
