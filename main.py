@@ -115,11 +115,11 @@ class Robot:
 
 	def shutdown_components(self):
 		logger.info("Robot.shutdown_components")
-		if self.movement:
-			try:
-				self.movement.cleanup()
-			except Exception as e:
-				logger.error(f"Robot.Error cleaning up movement controller: {e}")
+		# if self.movement:
+		# 	try:
+		# 		self.movement.cleanup()
+		# 	except Exception as e:
+		# 		logger.error(f"Robot.Error cleaning up movement controller: {e}")
 
 		if self.light_strip:
 			try:
