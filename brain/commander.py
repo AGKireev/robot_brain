@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, Union, Callable
 
 from servo import move
 from system import info, config
+from servo.move import RobotMovement  # Update import
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,6 +38,8 @@ class Commander:
 
         self.camera_moving_lr = False
         self.camera_moving_ud = False
+
+        self.movement = RobotMovement(servo_legs)  # Create movement controller
 
     def process(self, data: str) -> Dict[str, Any]:
         """Process commands received from the WebSocket."""
@@ -131,35 +134,28 @@ class Commander:
         # Always reset turn command when changing direction
         self.turn_command = "no"
         self.direction_command = direction
-        move.command(self.direction_command)
+        self.movement.command(self.direction_command)  # Use movement instance
 
     def _handle_turn(self, direction: str):
         """Handle turning commands (left, right, no)"""
         # Always reset direction command when turning
         self.direction_command = "no"
         self.turn_command = "no" if direction == "turn_stop" else direction
-        move.command(self.turn_command)
+        self.movement.command(self.turn_command)  # Updated to use movement instance
 
     def _handle_camera_look(self, direction: str):
         """Handle camera look commands."""
-        servo_map = {
-            "left": (self.servo_camera_lr, 12, 1, "lr"),
-            "right": (self.servo_camera_lr, 12, -1, "lr"),
-            "up": (self.servo_camera_ud, 13, 1, "ud"),
-            "down": (self.servo_camera_ud, 13, -1, "ud")
+        look_map = {
+            "left": self.movement.look_left,
+            "right": self.movement.look_right,
+            "up": self.movement.look_up,
+            "down": self.movement.look_down
         }
         
-        if direction not in servo_map:
+        if direction not in look_map:
             raise ValueError(f"Invalid camera direction: {direction}")
         
-        servo, pin, value, axis = servo_map[direction]
-        
-        if axis == "lr":
-            self.camera_moving_lr = True
-        else:
-            self.camera_moving_ud = True
-        
-        servo.single_servo(pin, value, 7)
+        look_map[direction]()
 
     def _handle_camera_stop(self, axis: str):
         """Handle camera stop commands."""
@@ -170,8 +166,7 @@ class Commander:
 
     def _handle_camera_home(self):
         """Reset camera position to home."""
-        self.servo_camera_lr.single_servo(12, 0, 7)
-        self.servo_camera_ud.single_servo(13, 0, 7)
+        self.movement.look_home()
 
     def _handle_get_info(self):
         """Get system information."""
