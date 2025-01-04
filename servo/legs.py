@@ -292,7 +292,7 @@ class LegsMovement:
         """
         logger.debug(f"Moving - step: {step_input}, speed: {speed}, command: {command}")
         
-        step_I = step_input
+        # Calculate second tripod step (offset by 2 from first tripod)
         step_II = step_input + 2
         if step_II > 4:
             step_II = step_II - 4
@@ -300,30 +300,80 @@ class LegsMovement:
         if speed == 0:
             return
 
+        # Height adjustment for lift phase
+        lift_height = 50  # Increased lift height for better ground clearance
+        
         if command == 'no':
             # First tripod: right_I (back right), left_II (middle left), right_III (front right)
-            self.control_leg('right_I', step_I, speed)
-            self.control_leg('left_II', step_I, speed)
-            self.control_leg('right_III', step_I, speed)
-
-            # Second tripod: left_I (front left), right_II (middle right), left_III (back left)
-            self.control_leg('left_I', step_II, speed)
-            self.control_leg('right_II', step_II, speed)
-            self.control_leg('left_III', step_II, speed)
+            # In lift phase (step 1), increase height and move forward
+            # In stance phase (step 2-4), maintain ground contact and move backward
+            if step_input == 1:
+                # Lift phase for first tripod
+                self.control_leg('right_I', step_input, speed, lift_height)
+                self.control_leg('left_II', step_input, speed, lift_height)
+                self.control_leg('right_III', step_input, speed, lift_height)
+                # Stance phase for second tripod
+                self.control_leg('left_I', step_II, -speed)
+                self.control_leg('right_II', step_II, -speed)
+                self.control_leg('left_III', step_II, -speed)
+            else:
+                # Stance phase for first tripod
+                self.control_leg('right_I', step_input, -speed)
+                self.control_leg('left_II', step_input, -speed)
+                self.control_leg('right_III', step_input, -speed)
+                # Lift phase for second tripod if it's their turn
+                if step_II == 1:
+                    self.control_leg('left_I', step_II, speed, lift_height)
+                    self.control_leg('right_II', step_II, speed, lift_height)
+                    self.control_leg('left_III', step_II, speed, lift_height)
+                else:
+                    self.control_leg('left_I', step_II, -speed)
+                    self.control_leg('right_II', step_II, -speed)
+                    self.control_leg('left_III', step_II, -speed)
+                    
         elif command == 'left':
-            self.control_leg('right_I', step_I, speed)
-            self.control_leg('left_II', step_I, -speed)
-            self.control_leg('right_III', step_I, speed)
-            self.control_leg('left_I', step_II, -speed)
-            self.control_leg('right_II', step_II, speed)
-            self.control_leg('left_III', step_II, -speed)
+            # Similar pattern but with opposite directions for left/right legs
+            if step_input == 1:
+                self.control_leg('right_I', step_input, speed, lift_height)
+                self.control_leg('left_II', step_input, -speed, lift_height)
+                self.control_leg('right_III', step_input, speed, lift_height)
+                self.control_leg('left_I', step_II, -speed)
+                self.control_leg('right_II', step_II, speed)
+                self.control_leg('left_III', step_II, -speed)
+            else:
+                self.control_leg('right_I', step_input, -speed)
+                self.control_leg('left_II', step_input, speed)
+                self.control_leg('right_III', step_input, -speed)
+                if step_II == 1:
+                    self.control_leg('left_I', step_II, -speed, lift_height)
+                    self.control_leg('right_II', step_II, speed, lift_height)
+                    self.control_leg('left_III', step_II, -speed, lift_height)
+                else:
+                    self.control_leg('left_I', step_II, speed)
+                    self.control_leg('right_II', step_II, -speed)
+                    self.control_leg('left_III', step_II, speed)
+                    
         elif command == 'right':
-            self.control_leg('right_I', step_I, -speed)
-            self.control_leg('left_II', step_I, speed)
-            self.control_leg('right_III', step_I, -speed)
-            self.control_leg('left_I', step_II, speed)
-            self.control_leg('right_II', step_II, -speed)
-            self.control_leg('left_III', step_II, speed)
+            # Mirror of left turn
+            if step_input == 1:
+                self.control_leg('right_I', step_input, -speed, lift_height)
+                self.control_leg('left_II', step_input, speed, lift_height)
+                self.control_leg('right_III', step_input, -speed, lift_height)
+                self.control_leg('left_I', step_II, speed)
+                self.control_leg('right_II', step_II, -speed)
+                self.control_leg('left_III', step_II, speed)
+            else:
+                self.control_leg('right_I', step_input, speed)
+                self.control_leg('left_II', step_input, -speed)
+                self.control_leg('right_III', step_input, speed)
+                if step_II == 1:
+                    self.control_leg('left_I', step_II, speed, lift_height)
+                    self.control_leg('right_II', step_II, -speed, lift_height)
+                    self.control_leg('left_III', step_II, speed, lift_height)
+                else:
+                    self.control_leg('left_I', step_II, -speed)
+                    self.control_leg('right_II', step_II, speed)
+                    self.control_leg('left_III', step_II, -speed)
 
     def dove(self, step_input: int, speed: int, timeLast: float, dpi: int, command: str) -> None:
         """Execute a dove movement sequence.
