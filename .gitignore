@@ -1,4 +1,13 @@
-.idea
-__pycache__
-venv
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Runtime configuration
+config.json
+
+# Environment
 .env
+venv/
+env/
+.idea

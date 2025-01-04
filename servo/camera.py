@@ -15,13 +15,6 @@ class CameraMovement:
         self.sc = servo_ctrl
         logger.info("Initializing CameraMovement with servo controller")
         
-        # Movement limits
-        self.horizontal_max = 500
-        self.horizontal_min = 140
-        self.vertical_max = 500
-        self.vertical_min = 270
-        logger.info(f"Movement limits set - Horizontal: [{self.horizontal_min}, {self.horizontal_max}], Vertical: [{self.vertical_min}, {self.vertical_max}]")
-        
         # Get channel numbers from servo controller
         self.horizontal_channel = self.sc.pwm_channels[0]  # Channel 12
         self.vertical_channel = self.sc.pwm_channels[1]    # Channel 13
@@ -31,6 +24,13 @@ class CameraMovement:
         self._horizontal_pos = self.sc.init_positions[self.horizontal_channel]
         self._vertical_pos = self.sc.init_positions[self.vertical_channel]
         logger.info(f"Initial positions - Horizontal: {self._horizontal_pos}, Vertical: {self._vertical_pos}")
+        
+        # Get limits from base class
+        self.horizontal_max = self.sc.max_positions[self.horizontal_channel]
+        self.horizontal_min = self.sc.min_positions[self.horizontal_channel]
+        self.vertical_max = self.sc.max_positions[self.vertical_channel]
+        self.vertical_min = self.sc.min_positions[self.vertical_channel]
+        logger.info(f"Using limits - Horizontal: [{self.horizontal_min}, {self.horizontal_max}], Vertical: [{self.vertical_min}, {self.vertical_max}]")
 
     def _can_move(self, direction: str) -> bool:
         """Check if movement in given direction is possible."""

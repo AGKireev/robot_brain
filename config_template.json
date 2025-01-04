@@ -1,6 +1,10 @@
 {
   "servos": {
     "legs": {
+      "limits": {
+        "min": 100,
+        "max": 520
+      },
       "front_left": {
         "channels": { "horizontal": 0, "vertical": 1 },
         "center_position": { "horizontal": 300, "vertical": 300 },
@@ -33,6 +37,16 @@
       }
     },
     "camera": {
+      "limits": {
+        "horizontal": {
+          "min": 140,
+          "max": 500
+        },
+        "vertical": {
+          "min": 270,
+          "max": 500
+        }
+      },
       "channels": {
         "horizontal": 12,
         "vertical": 13

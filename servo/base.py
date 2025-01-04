@@ -119,12 +119,31 @@ class ServoCtrl(threading.Thread):
             self.buffer_positions[channel] = 300.0
             self.last_positions[channel] = 300
             self.ing_goal[channel] = 300
-            self.min_positions[channel] = 100
-            self.max_positions[channel] = 520
+            
+            # Set channel-specific limits from config
+            if servo_group == 'camera':
+                limits = servo_config['camera']['limits']
+                if channel == channels['horizontal']:
+                    self.min_positions[channel] = limits['horizontal']['min']
+                    self.max_positions[channel] = limits['horizontal']['max']
+                else:  # vertical
+                    self.min_positions[channel] = limits['vertical']['min']
+                    self.max_positions[channel] = limits['vertical']['max']
+            else:  # legs
+                limits = servo_config['legs']['limits']
+                self.min_positions[channel] = limits['min']
+                self.max_positions[channel] = limits['max']
+            
             self.sc_speed[channel] = 0
+            
+        logger.info("Channel limits:")
+        for channel in self.pwm_channels:
+            logger.info(f"Channel {channel}: min={self.min_positions[channel]}, max={self.max_positions[channel]}")
 
-        self.ctrl_range_max: int = 520
-        self.ctrl_range_min: int = 100
+        # Set global control range from leg limits since they define the full servo range
+        leg_limits = servo_config['legs']['limits']
+        self.ctrl_range_max: int = leg_limits['max']
+        self.ctrl_range_min: int = leg_limits['min']
         self.angle_range: int = 180
 
         '''
