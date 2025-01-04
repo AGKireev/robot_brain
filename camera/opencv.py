@@ -37,240 +37,240 @@ findLineError = 60
 colorUpper = np.array([44, 255, 255])
 colorLower = np.array([24, 100, 100])
 
-class CVThread(threading.Thread):
-	font = cv2.FONT_HERSHEY_SIMPLEX
+# class CVThread(threading.Thread):
+# 	font = cv2.FONT_HERSHEY_SIMPLEX
 
-	kalman_filter_X = KalmanFilter(0.01, 0.1)
-	kalman_filter_Y = KalmanFilter(0.01, 0.1)
-	P_direction = -1
-	T_direction = 1
-	P_servo = 12
-	T_servo = 13
-	P_anglePos = 0
-	T_anglePos = 0
-	cameraDiagonalW = 64
-	cameraDiagonalH = 48
-	videoW = 640
-	videoH = 480
-	Y_lock = 0
-	X_lock = 0
-	tor = 27
+# 	kalman_filter_X = KalmanFilter(0.01, 0.1)
+# 	kalman_filter_Y = KalmanFilter(0.01, 0.1)
+# 	P_direction = -1
+# 	T_direction = 1
+# 	P_servo = 12
+# 	T_servo = 13
+# 	P_anglePos = 0
+# 	T_anglePos = 0
+# 	cameraDiagonalW = 64
+# 	cameraDiagonalH = 48
+# 	videoW = 640
+# 	videoH = 480
+# 	Y_lock = 0
+# 	X_lock = 0
+# 	tor = 27
 
-	# TODO: MUST be inited from webServer and passed!
-	scGear = ServoCtrl()
-	scGear.move_init()
-	# Single LED switches, not used now
-	# switch.switchSetup()
+# 	# TODO: MUST be inited from webServer and passed!
+# 	scGear = ServoCtrl()
+# 	scGear.move_init()
+# 	# Single LED switches, not used now
+# 	# switch.switchSetup()
 
-	def __init__(self, *args, **kwargs):
-		self.CVThreading = 0
-		self.CVMode = 'none'
-		self.imgCV = None
+# 	def __init__(self, *args, **kwargs):
+# 		self.CVThreading = 0
+# 		self.CVMode = 'none'
+# 		self.imgCV = None
 
-		self.mov_x = None
-		self.mov_y = None
-		self.mov_w = None
-		self.mov_h = None
+# 		self.mov_x = None
+# 		self.mov_y = None
+# 		self.mov_w = None
+# 		self.mov_h = None
 
-		self.radius = 0
-		self.box_x = None
-		self.box_y = None
-		self.drawing = 0
+# 		self.radius = 0
+# 		self.box_x = None
+# 		self.box_y = None
+# 		self.drawing = 0
 
-		self.findColorDetection = 0
+# 		self.findColorDetection = 0
 
-		self.left_Pos1 = None
-		self.right_Pos1 = None
-		self.center_Pos1 = None
+# 		self.left_Pos1 = None
+# 		self.right_Pos1 = None
+# 		self.center_Pos1 = None
 
-		self.left_Pos2 = None
-		self.right_Pos2 = None
-		self.center_Pos2 = None
+# 		self.left_Pos2 = None
+# 		self.right_Pos2 = None
+# 		self.center_Pos2 = None
 
-		self.center = None
+# 		self.center = None
 
-		super(CVThread, self).__init__(*args, **kwargs)
-		self.__flag = threading.Event()
-		self.__flag.clear()
+# 		super(CVThread, self).__init__(*args, **kwargs)
+# 		self.__flag = threading.Event()
+# 		self.__flag.clear()
 
-		self.avg = None
-		self.motionCounter = 0
-		self.lastMotionCaptured = datetime.datetime.now()
-		self.frameDelta = None
-		self.thresh = None
-		self.cnts = None
+# 		self.avg = None
+# 		self.motionCounter = 0
+# 		self.lastMotionCaptured = datetime.datetime.now()
+# 		self.frameDelta = None
+# 		self.thresh = None
+# 		self.cnts = None
 
-	def mode(self, invar, img_input):
-		self.CVMode = invar
-		self.imgCV = img_input
-		self.resume()
+# 	def mode(self, invar, img_input):
+# 		self.CVMode = invar
+# 		self.imgCV = img_input
+# 		self.resume()
 
-	def element_draw(self, img_input):
-		if self.CVMode == 'none':
-			pass
+# 	def element_draw(self, img_input):
+# 		if self.CVMode == 'none':
+# 			pass
 
-		elif self.CVMode == 'findColor':
-			if self.findColorDetection:
-				cv2.putText(img_input,'Target Detected',(40,60), CVThread.font, 0.5,(255,255,255),1,cv2.LINE_AA)
-				self.drawing = 1
-			else:
-				cv2.putText(img_input,'Target Detecting',(40,60), CVThread.font, 0.5,(255,255,255),1,cv2.LINE_AA)
-				self.drawing = 0
+# 		elif self.CVMode == 'findColor':
+# 			if self.findColorDetection:
+# 				cv2.putText(img_input,'Target Detected',(40,60), CVThread.font, 0.5,(255,255,255),1,cv2.LINE_AA)
+# 				self.drawing = 1
+# 			else:
+# 				cv2.putText(img_input,'Target Detecting',(40,60), CVThread.font, 0.5,(255,255,255),1,cv2.LINE_AA)
+# 				self.drawing = 0
 
-			if self.radius > 10 and self.drawing:
-				cv2.rectangle(img_input,(int(self.box_x-self.radius),int(self.box_y+self.radius)),(int(self.box_x+self.radius),int(self.box_y-self.radius)),(255,255,255),1)
+# 			if self.radius > 10 and self.drawing:
+# 				cv2.rectangle(img_input,(int(self.box_x-self.radius),int(self.box_y+self.radius)),(int(self.box_x+self.radius),int(self.box_y-self.radius)),(255,255,255),1)
 
-		elif self.CVMode == 'watchDog':
-			if self.drawing:
-				cv2.rectangle(img_input, (self.mov_x, self.mov_y), (self.mov_x + self.mov_w, self.mov_y + self.mov_h), (128, 255, 0), 1)
+# 		elif self.CVMode == 'watchDog':
+# 			if self.drawing:
+# 				cv2.rectangle(img_input, (self.mov_x, self.mov_y), (self.mov_x + self.mov_w, self.mov_y + self.mov_h), (128, 255, 0), 1)
 
-		return img_input
+# 		return img_input
 
 
-	def watch_dog(self, img_input):
-		logger.info('watchDog.started')
+# 	def watch_dog(self, img_input):
+# 		logger.info('watchDog.started')
 
-		timestamp = datetime.datetime.now()
-		gray = cv2.cvtColor(img_input, cv2.COLOR_BGR2GRAY)
-		gray = cv2.GaussianBlur(gray, (21, 21), 0)
+# 		timestamp = datetime.datetime.now()
+# 		gray = cv2.cvtColor(img_input, cv2.COLOR_BGR2GRAY)
+# 		gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
-		if self.avg is None:
-			logger.info("starting background model...")
-			self.avg = gray.copy().astype("float")
-			return 'background model'
+# 		if self.avg is None:
+# 			logger.info("starting background model...")
+# 			self.avg = gray.copy().astype("float")
+# 			return 'background model'
 
-		cv2.accumulateWeighted(gray, self.avg, 0.5)
-		self.frameDelta = cv2.absdiff(gray, cv2.convertScaleAbs(self.avg))
+# 		cv2.accumulateWeighted(gray, self.avg, 0.5)
+# 		self.frameDelta = cv2.absdiff(gray, cv2.convertScaleAbs(self.avg))
 
-		# threshold the delta image, dilate the thresholded image to fill
-		# in holes, then find contours on thresholded image
-		self.thresh = cv2.threshold(self.frameDelta, 5, 255,
-			cv2.THRESH_BINARY)[1]
-		self.thresh = cv2.dilate(self.thresh, None, iterations=2)
-		self.cnts = cv2.findContours(self.thresh.copy(), cv2.RETR_EXTERNAL,
-			cv2.CHAIN_APPROX_SIMPLE)
-		self.cnts = imutils.grab_contours(self.cnts)
-		# logger.info('x')
+# 		# threshold the delta image, dilate the thresholded image to fill
+# 		# in holes, then find contours on thresholded image
+# 		self.thresh = cv2.threshold(self.frameDelta, 5, 255,
+# 			cv2.THRESH_BINARY)[1]
+# 		self.thresh = cv2.dilate(self.thresh, None, iterations=2)
+# 		self.cnts = cv2.findContours(self.thresh.copy(), cv2.RETR_EXTERNAL,
+# 			cv2.CHAIN_APPROX_SIMPLE)
+# 		self.cnts = imutils.grab_contours(self.cnts)
+# 		# logger.info('x')
 
-		logger.info('watchDog: contours')
-		logger.info(self.cnts)
+# 		logger.info('watchDog: contours')
+# 		logger.info(self.cnts)
 
-		# loop over the contours
-		for c in self.cnts:
-			# if the contour is too small, ignore it
-			if cv2.contourArea(c) < 5000:
-				continue
+# 		# loop over the contours
+# 		for c in self.cnts:
+# 			# if the contour is too small, ignore it
+# 			if cv2.contourArea(c) < 5000:
+# 				continue
 	 
-			# compute the bounding box for the contour, draw it on the frame,
-			# and update the text
-			(self.mov_x, self.mov_y, self.mov_w, self.mov_h) = cv2.boundingRect(c)
-			self.drawing = 1
+# 			# compute the bounding box for the contour, draw it on the frame,
+# 			# and update the text
+# 			(self.mov_x, self.mov_y, self.mov_w, self.mov_h) = cv2.boundingRect(c)
+# 			self.drawing = 1
 			
-			self.motionCounter += 1
-			#logger.info(motionCounter)
-			#logger.info(text)
-			self.lastMotionCaptured = timestamp
-			# light_strip.set_color(255,78,0)
-			# leds.both_off()
-			# leds.red()
-			# Single LED switches, not used now
-			# switch.switch(1,1)
-			# switch.switch(2,1)
-			# switch.switch(3,1)
+# 			self.motionCounter += 1
+# 			#logger.info(motionCounter)
+# 			#logger.info(text)
+# 			self.lastMotionCaptured = timestamp
+# 			# light_strip.set_color(255,78,0)
+# 			# leds.both_off()
+# 			# leds.red()
+# 			# Single LED switches, not used now
+# 			# switch.switch(1,1)
+# 			# switch.switch(2,1)
+# 			# switch.switch(3,1)
 
-		if (timestamp - self.lastMotionCaptured).seconds >= 0.5:
-			logger.info('watchDog: no motion detected')
-			# light_strip.set_color(0,78,255)
-			# leds.both_off()
-			# leds.blue()
-			self.drawing = 0
-			# Single LED switches, not used now
-			# switch.switch(1,0)
-			# switch.switch(2,0)
-			# switch.switch(3,0)
-		self.pause()
+# 		if (timestamp - self.lastMotionCaptured).seconds >= 0.5:
+# 			logger.info('watchDog: no motion detected')
+# 			# light_strip.set_color(0,78,255)
+# 			# leds.both_off()
+# 			# leds.blue()
+# 			self.drawing = 0
+# 			# Single LED switches, not used now
+# 			# switch.switch(1,0)
+# 			# switch.switch(2,0)
+# 			# switch.switch(3,0)
+# 		self.pause()
 
-	def servo_move(ID, Dir, errorInput):
-		if ID == 12:
-			errorGenOut = CVThread.kalman_filter_X.kalman(errorInput)
-			CVThread.P_anglePos += 0.15*(errorGenOut*Dir)*CVThread.cameraDiagonalW/CVThread.videoW
+# 	def servo_move(ID, Dir, errorInput):
+# 		if ID == 12:
+# 			errorGenOut = CVThread.kalman_filter_X.kalman(errorInput)
+# 			CVThread.P_anglePos += 0.15*(errorGenOut*Dir)*CVThread.cameraDiagonalW/CVThread.videoW
 
-			if abs(errorInput) > CVThread.tor:
-				CVThread.scGear.move_angle(ID, CVThread.P_anglePos)
-				CVThread.X_lock = 0
-			else:
-				CVThread.X_lock = 1
-		elif ID == 13:
-			error_gen_out = CVThread.kalman_filter_Y.kalman(errorInput)
-			CVThread.T_anglePos += 0.15*(error_gen_out*Dir)*CVThread.cameraDiagonalH/CVThread.videoH
+# 			if abs(errorInput) > CVThread.tor:
+# 				CVThread.scGear.move_angle(ID, CVThread.P_anglePos)
+# 				CVThread.X_lock = 0
+# 			else:
+# 				CVThread.X_lock = 1
+# 		elif ID == 13:
+# 			error_gen_out = CVThread.kalman_filter_Y.kalman(errorInput)
+# 			CVThread.T_anglePos += 0.15*(error_gen_out*Dir)*CVThread.cameraDiagonalH/CVThread.videoH
 
-			if abs(errorInput) > CVThread.tor:
-				CVThread.scGear.move_angle(ID, CVThread.T_anglePos)
-				CVThread.Y_lock = 0
-			else:
-				CVThread.Y_lock = 1
-		else:
-			logger.info(f"No servoPort {ID} assigned.")
-
-
-	def find_color(self, frame_image):
-		hsv = cv2.cvtColor(frame_image, cv2.COLOR_BGR2HSV)
-		mask = cv2.inRange(hsv, colorLower, colorUpper)#1
-		mask = cv2.erode(mask, None, iterations=2)
-		mask = cv2.dilate(mask, None, iterations=2)
-		cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
-			cv2.CHAIN_APPROX_SIMPLE)[-2]
-		center = None
-		if len(cnts) > 0:
-			self.findColorDetection = 1
-			c = max(cnts, key=cv2.contourArea)
-			((self.box_x, self.box_y), self.radius) = cv2.minEnclosingCircle(c)
-			m = cv2.moments(c)
-			center = (int(m["m10"] / m["m00"]), int(m["m01"] / m["m00"]))
-			x = int(self.box_x)
-			y = int(self.box_y)
-			error_y = 240 - y
-			error_x = 320 - x
-			CVThread.servo_move(CVThread.P_servo, CVThread.P_direction, -error_x)
-			CVThread.servo_move(CVThread.T_servo, CVThread.T_direction, -error_y)
-
-			if CVThread.X_lock == 1 and CVThread.Y_lock == 1:
-				# light_strip.set_color(255,78,0)
-				# led.both_off()
-				# led.red()
-				logger.info('CVThread: findColor locked')
-			else:
-				# light_strip.set_color(0,78,255)
-				# led.both_off()
-				# led.blue()
-				logger.info('CVThread: findColor unlocked')
-		else:
-			self.findColorDetection = 0
-		self.pause()
+# 			if abs(errorInput) > CVThread.tor:
+# 				CVThread.scGear.move_angle(ID, CVThread.T_anglePos)
+# 				CVThread.Y_lock = 0
+# 			else:
+# 				CVThread.Y_lock = 1
+# 		else:
+# 			logger.info(f"No servoPort {ID} assigned.")
 
 
-	def pause(self):
-		self.__flag.clear()
+# 	def find_color(self, frame_image):
+# 		hsv = cv2.cvtColor(frame_image, cv2.COLOR_BGR2HSV)
+# 		mask = cv2.inRange(hsv, colorLower, colorUpper)#1
+# 		mask = cv2.erode(mask, None, iterations=2)
+# 		mask = cv2.dilate(mask, None, iterations=2)
+# 		cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+# 			cv2.CHAIN_APPROX_SIMPLE)[-2]
+# 		center = None
+# 		if len(cnts) > 0:
+# 			self.findColorDetection = 1
+# 			c = max(cnts, key=cv2.contourArea)
+# 			((self.box_x, self.box_y), self.radius) = cv2.minEnclosingCircle(c)
+# 			m = cv2.moments(c)
+# 			center = (int(m["m10"] / m["m00"]), int(m["m01"] / m["m00"]))
+# 			x = int(self.box_x)
+# 			y = int(self.box_y)
+# 			error_y = 240 - y
+# 			error_x = 320 - x
+# 			CVThread.servo_move(CVThread.P_servo, CVThread.P_direction, -error_x)
+# 			CVThread.servo_move(CVThread.T_servo, CVThread.T_direction, -error_y)
 
-	def resume(self):
-		self.__flag.set()
+# 			if CVThread.X_lock == 1 and CVThread.Y_lock == 1:
+# 				# light_strip.set_color(255,78,0)
+# 				# led.both_off()
+# 				# led.red()
+# 				logger.info('CVThread: findColor locked')
+# 			else:
+# 				# light_strip.set_color(0,78,255)
+# 				# led.both_off()
+# 				# led.blue()
+# 				logger.info('CVThread: findColor unlocked')
+# 		else:
+# 			self.findColorDetection = 0
+# 		self.pause()
 
-	def run(self):
-		while 1:
-			self.__flag.wait()
-			if self.CVMode == 'none':
-				servo.move.command('stand')
-				servo.move.command('no')
-				continue
-			elif self.CVMode == 'findColor':
-				self.CVThreading = 1
-				self.find_color(self.imgCV)
-				self.CVThreading = 0
-			elif self.CVMode == 'watchDog':
-				self.CVThreading = 1
-				self.watch_dog(self.imgCV)
-				self.CVThreading = 0
-			pass
+
+# 	def pause(self):
+# 		self.__flag.clear()
+
+# 	def resume(self):
+# 		self.__flag.set()
+
+# 	def run(self):
+# 		while 1:
+# 			self.__flag.wait()
+# 			if self.CVMode == 'none':
+# 				servo.move.command('stand')
+# 				servo.move.command('no')
+# 				continue
+# 			elif self.CVMode == 'findColor':
+# 				self.CVThreading = 1
+# 				self.find_color(self.imgCV)
+# 				self.CVThreading = 0
+# 			elif self.CVMode == 'watchDog':
+# 				self.CVThreading = 1
+# 				self.watch_dog(self.imgCV)
+# 				self.CVThreading = 0
+# 			pass
 
 
 class Camera(BaseCamera):
