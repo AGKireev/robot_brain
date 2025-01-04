@@ -141,17 +141,20 @@ class Commander:
         self.turn_command = "no" if direction == "turn_stop" else direction
         self.legs_movement.command(self.turn_command)  # Updated to use legs_movement instance
 
-    def _handle_camera_look(self, direction: str):
+    def _handle_camera_look(self, direction: str) -> None:
         """Handle camera look commands."""
-        self.camera_movement.single_servo(direction)
+        logger.info(f"Camera look command: {direction}")
+        self.camera_movement.move(direction, continuous=True)
 
-    def _handle_camera_stop(self, axis: str):
+    def _handle_camera_stop(self, axis: str) -> None:
         """Handle camera stop commands."""
-        self.camera_movement.stop_movement(axis)
+        logger.info(f"Camera stop command: {axis}")
+        self.camera_movement.stop(axis)
 
-    def _handle_camera_home(self):
-        """Reset camera position to home."""
-        self.camera_movement.look_home()
+    def _handle_camera_home(self) -> None:
+        """Handle camera home command."""
+        logger.info("Camera home command")
+        self.camera_movement.home()
 
     def _handle_get_info(self):
         """Get system information."""
