@@ -302,7 +302,7 @@ class LegsMovement:
 
         # Height adjustment for lift phase
         lift_height = 50  # Increased lift height for better ground clearance
-        
+
         if command == 'no':
             # First tripod: right_I (back right), left_II (middle left), right_III (front right)
             # In lift phase (step 1), increase height and move forward
@@ -419,7 +419,7 @@ class LegsMovement:
         if step_II > 4:
             step_II = step_II - 4
 
-        if speed > 0:
+        if speed > 0:  # Forward movement
             if step_input == 1:
                 for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
                     if self.move_stu and command == 'no':
@@ -459,7 +459,6 @@ class LegsMovement:
 
                     if self.move_stu == 0 and command == 'no':
                         break
-            
             elif step_input == 2:
                 for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
                     if self.move_stu and command == 'no':
@@ -474,7 +473,7 @@ class LegsMovement:
                         dove_control_leg('right_III', -speed_II, -10)
                         time.sleep(timeLast / dpi)
                     # Similar patterns for left/right commands
-            
+
             elif step_input == 3:
                 for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
                     if self.move_stu and command == 'no':
@@ -489,7 +488,7 @@ class LegsMovement:
                         dove_control_leg('right_III', -speed_I, 3 * speed_II)
                         time.sleep(timeLast / dpi)
                     # Similar patterns for left/right commands
-            
+
             elif step_input == 4:
                 for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
                     if self.move_stu and command == 'no':
@@ -504,6 +503,25 @@ class LegsMovement:
                         dove_control_leg('right_III', speed_II, 3 * (speed - speed_II))
                         time.sleep(timeLast / dpi)
                     # Similar patterns for left/right commands
+
+        else:  # Backward movement
+            speed = -speed  # Make speed positive for calculations
+            if step_input == 1:
+                for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
+                    if self.move_stu and command == 'no':
+                        speed_II = speed_I
+                        speed_I = speed - speed_I
+                        # First tripod moves up and backward
+                        dove_control_leg('left_I', speed_I, 3 * speed_II)
+                        dove_control_leg('right_II', speed_I, 3 * speed_II)
+                        dove_control_leg('left_III', speed_I, 3 * speed_II)
+                        # Second tripod stays down and moves forward
+                        dove_control_leg('right_I', -speed_I, -10)
+                        dove_control_leg('left_II', -speed_I, -10)
+                        dove_control_leg('right_III', -speed_I, -10)
+                        time.sleep(timeLast / dpi)
+                    if self.move_stu == 0 and command == 'no':
+                        break
 
     def _move_thread(self) -> None:
         """Internal movement thread function."""
@@ -533,7 +551,7 @@ class LegsMovement:
                     time.sleep(0.1)
                 
                 self.step_set = (self.step_set % 4) + 1
-                
+
             elif self.direction_command == 'stand':
                 logger.debug("Moving to stand position")
                 self.stand()
