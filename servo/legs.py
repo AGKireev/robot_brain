@@ -391,15 +391,29 @@ class LegsMovement:
             """Control a single leg's dove movement."""
             leg = self.LEG_MAP[leg_id]
             
-            if leg['direction']:
-                self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] + horizontal)
+            # For left legs
+            if leg_id.startswith('left'):
+                if leg['direction']:  # leftSide_direction == 1
+                    self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] + horizontal)
+                else:  # leftSide_direction == 0
+                    self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] - horizontal)
+                
+                if leg['height']:  # leftSide_height == 1
+                    self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] + vertical)
+                else:  # leftSide_height == 0
+                    self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] - vertical)
+            
+            # For right legs
             else:
-                self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] - horizontal)
-
-            if leg['height']:
-                self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] + vertical)
-            else:
-                self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] - vertical)
+                if leg['direction']:  # rightSide_direction == 1
+                    self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] + horizontal)
+                else:  # rightSide_direction == 0
+                    self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] - horizontal)
+                
+                if leg['height']:  # rightSide_height == 1
+                    self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] + vertical)
+                else:  # rightSide_height == 0
+                    self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] - vertical)
         
         step_II = step_input + 2
         if step_II > 4:
@@ -411,11 +425,12 @@ class LegsMovement:
                     if self.move_stu and command == 'no':
                         speed_II = speed_I
                         speed_I = speed - speed_I
-                        dove_control_leg('left_I', -speed_I, 3 * speed_II)  # Negative for first tripod
+                        # First tripod moves up and forward
+                        dove_control_leg('left_I', -speed_I, 3 * speed_II)
                         dove_control_leg('right_II', -speed_I, 3 * speed_II)
                         dove_control_leg('left_III', -speed_I, 3 * speed_II)
-
-                        dove_control_leg('right_I', speed_I, -10)  # Positive for second tripod
+                        # Second tripod stays down and moves backward
+                        dove_control_leg('right_I', speed_I, -10)
                         dove_control_leg('left_II', speed_I, -10)
                         dove_control_leg('right_III', speed_I, -10)
                         time.sleep(timeLast / dpi)
