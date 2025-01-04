@@ -1,6 +1,7 @@
 import time
 import threading
 import logging
+from typing import Dict, List, Optional, Union
 
 from servo import base
 from system.kalman_filter import KalmanFilter
@@ -10,34 +11,35 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class LegsMovement:
+    """Controls the movement of the hexapod robot's legs."""
+    
     def __init__(self, servo_ctrl: base.ServoCtrl):
+        """Initialize legs movement controller.
+        
+        Args:
+            servo_ctrl: ServoCtrl instance configured for leg servos
+        """
         self.sc = servo_ctrl
         self.init_pwms = self.sc.init_positions.copy()
+        logger.info("Initializing LegsMovement with servo controller")
         
-        # Configuration
-        self.set_direction = 1
-        self.leftSide_direction = 1 if self.set_direction else 0
-        self.rightSide_direction = 0 if self.set_direction else 1
-        self.leftSide_height = 0 if self.set_direction else 1
-        self.rightSide_height = 1 if self.set_direction else 0
+        # Get configuration
+        self.config = base.servo_config['legs']
+        logger.debug(f"Loaded leg configuration: {self.config}")
         
-        # Movement configuration
+        # Movement parameters
         self.height_change = 30
-        self.Up_Down_direction = 1 if self.set_direction else 0
-        self.Left_Right_direction = 1 if self.set_direction else 0
-        
-        # Camera movement settings
-        self.Left_Right_input = 300
-        self.Up_Down_input = 300
-        self.Left_Right_Max = 500
-        self.Left_Right_Min = 100
-        self.Up_Down_Max = 500
-        self.Up_Down_Min = 270
-        self.look_wiggle = 30
-        
-        # Movement state
         self.move_stu = 1
         self.DOVE_SPEED = 20
+        
+        # Movement state
+        self.step_set = 1
+        self.speed_set = 100
+        self.DPI = 17
+        self.direction_command = 'no'
+        self.turn_command = 'no'
+        self.SmoothMode = 1
+        self.steadyMode = 0
         
         # Steady mode configuration
         self.steady_range_Min = -40
@@ -52,6 +54,7 @@ class LegsMovement:
         self.I = 0.01
         self.D = 0
         
+        # Initialize PID controllers
         self.X_pid = PID.PID()
         self.X_pid.SetKp(self.P)
         self.X_pid.SetKd(self.I)
@@ -62,20 +65,12 @@ class LegsMovement:
         self.Y_pid.SetKd(self.I)
         self.Y_pid.SetKi(self.D)
         
+        # Initialize Kalman filters
         self.kalman_filter_X = KalmanFilter(0.001, 0.1)
         self.kalman_filter_Y = KalmanFilter(0.001, 0.1)
         
         self.target_X = 0
         self.target_Y = 0
-        
-        # Movement thread state
-        self.step_set = 1
-        self.speed_set = 100
-        self.DPI = 17
-        self.direction_command = 'no'
-        self.turn_command = 'no'
-        self.SmoothMode = 1
-        self.steadyMode = 0
         
         # Initialize leg mapping
         self._init_leg_map()
@@ -84,26 +79,52 @@ class LegsMovement:
         self.movement_thread = self._create_movement_thread()
         self.movement_thread.start()
         self.movement_thread.pause()
+        
+        # MPU sensor will be set externally
+        self.mpu_sensor = None
+        
+        logger.info("LegsMovement initialization complete")
 
     def _init_leg_map(self):
-        """Initialize the leg mapping configuration"""
-        self.LEG_MAP = {
-            'left_1':  {'horiz': 0, 'vert': 1, 'pwm_h': self.init_pwms[0], 'pwm_v': self.init_pwms[1], 
-                       'direction': self.leftSide_direction, 'height': self.leftSide_height},
-            'left_2':  {'horiz': 2, 'vert': 3, 'pwm_h': self.init_pwms[2], 'pwm_v': self.init_pwms[3], 
-                       'direction': self.leftSide_direction, 'height': self.leftSide_height},
-            'left_3':  {'horiz': 4, 'vert': 5, 'pwm_h': self.init_pwms[4], 'pwm_v': self.init_pwms[5], 
-                       'direction': self.leftSide_direction, 'height': self.leftSide_height},
-            'right_1': {'horiz': 6, 'vert': 7, 'pwm_h': self.init_pwms[6], 'pwm_v': self.init_pwms[7], 
-                       'direction': self.rightSide_direction, 'height': self.rightSide_height},
-            'right_2': {'horiz': 8, 'vert': 9, 'pwm_h': self.init_pwms[8], 'pwm_v': self.init_pwms[9], 
-                       'direction': self.rightSide_direction, 'height': self.rightSide_height},
-            'right_3': {'horiz': 10, 'vert': 11, 'pwm_h': self.init_pwms[10], 'pwm_v': self.init_pwms[11], 
-                       'direction': self.rightSide_direction, 'height': self.rightSide_height}
+        """Initialize the leg mapping configuration.
+        
+        Leg scheme:
+        left_I -<forward>-- right_III
+        left_II ---<BODY>--- right_II
+        left_III -<Backward>- right_I
+        """
+        self.LEG_MAP = {}
+        
+        # Map config names to our scheme
+        config_to_scheme = {
+            'front_left': 'left_I',
+            'middle_left': 'left_II',
+            'back_left': 'left_III',
+            'front_right': 'right_III',
+            'middle_right': 'right_II',
+            'back_right': 'right_I'
         }
+        
+        # Build leg map from config
+        for config_name, scheme_name in config_to_scheme.items():
+            leg_config = self.config[config_name]
+            channels = leg_config['channels']
+            positions = leg_config['center_position']
+            directions = leg_config['direction']
+            
+            self.LEG_MAP[scheme_name] = {
+                'horiz': channels['horizontal'],
+                'vert': channels['vertical'],
+                'pwm_h': positions['horizontal'],
+                'pwm_v': positions['vertical'],
+                'direction': directions['horizontal'],  # Use horizontal direction as main direction
+                'height': directions['vertical']  # Use vertical direction for height
+            }
+        
+        logger.debug(f"Initialized leg mapping: {self.LEG_MAP}")
 
     def _create_movement_thread(self):
-        """Create the movement control thread"""
+        """Create the movement control thread."""
         class MovementThread(threading.Thread):
             def __init__(self, robot_movement):
                 super().__init__()
@@ -124,42 +145,83 @@ class LegsMovement:
 
         return MovementThread(self)
 
-    def command(self, command_input: str):
-        """Process movement commands"""
-        logger.info(f"move: command({command_input})")
+    def command(self, command_input: str) -> None:
+        """Process movement commands.
+        
+        Args:
+            command_input: Command to execute (forward, backward, left, right, stand, no)
+        """
+        logger.info(f"Processing command: {command_input}")
+        
+        # Store previous state for logging
+        prev_direction = self.direction_command
+        prev_turn = self.turn_command
         
         if command_input == 'forward':
             self.direction_command = 'forward'
+            self.turn_command = 'no'  # Clear any turn command
             self.movement_thread.resume()
+            logger.info(f"Starting forward movement (prev: direction={prev_direction}, turn={prev_turn})")
+            
         elif command_input == 'backward':
             self.direction_command = 'backward'
+            self.turn_command = 'no'  # Clear any turn command
             self.movement_thread.resume()
-        elif 'stand' in command_input:
+            logger.info(f"Starting backward movement (prev: direction={prev_direction}, turn={prev_turn})")
+            
+        elif command_input == 'stand':
             self.direction_command = 'stand'
-            self.movement_thread.pause()
-        elif command_input == 'left':
-            self.turn_command = 'left'
-            self.movement_thread.resume()
-        elif command_input == 'right':
-            self.turn_command = 'right'
-            self.movement_thread.resume()
-        elif 'no' in command_input:
             self.turn_command = 'no'
             self.movement_thread.pause()
+            logger.info(f"Moving to stand position (prev: direction={prev_direction}, turn={prev_turn})")
+            
+        elif command_input == 'left':
+            self.turn_command = 'left'
+            self.direction_command = 'no'  # Clear any direction command
+            self.movement_thread.resume()
+            logger.info(f"Starting left turn (prev: direction={prev_direction}, turn={prev_turn})")
+            
+        elif command_input == 'right':
+            self.turn_command = 'right'
+            self.direction_command = 'no'  # Clear any direction command
+            self.movement_thread.resume()
+            logger.info(f"Starting right turn (prev: direction={prev_direction}, turn={prev_turn})")
+            
+        elif command_input == 'no':
+            self.turn_command = 'no'
+            self.direction_command = 'no'
+            self.movement_thread.pause()
+            logger.info(f"Stopping all movement (prev: direction={prev_direction}, turn={prev_turn})")
+            
         elif command_input == 'automaticOff':
             self.SmoothMode = 0
             self.steadyMode = 0
             self.movement_thread.pause()
+            logger.info("Disabled automatic/smooth mode")
+            
         elif command_input == 'automatic':
             self.movement_thread.resume()
             self.SmoothMode = 1
+            logger.info("Enabled automatic/smooth mode")
+            
         elif command_input == 'KD':
             self.steadyMode = 1
             self.movement_thread.resume()
+            logger.info("Enabled steady mode with Kalman filter")
+        
+        else:
+            logger.warning(f"Unknown command: {command_input}")
 
-    def control_leg(self, leg_id: str, pos: int, wiggle: int, heightAdjust: int = 0):
-        """Control a single leg's movement"""
-        logger.info(f"move: control_leg({leg_id}, {pos}, {wiggle}, {heightAdjust})")
+    def control_leg(self, leg_id: str, pos: int, wiggle: int, heightAdjust: int = 0) -> None:
+        """Control a single leg's movement.
+        
+        Args:
+            leg_id: ID of the leg to control
+            pos: Position state (0-4)
+            wiggle: Amount of wiggle movement
+            heightAdjust: Height adjustment value
+        """
+        logger.debug(f"Controlling leg {leg_id} - pos: {pos}, wiggle: {wiggle}, height: {heightAdjust}")
         
         leg = self.LEG_MAP[leg_id]
         
@@ -220,65 +282,76 @@ class LegsMovement:
                     else:
                         self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] + wiggle)
 
-    def dove_control_leg(self, leg_id: str, horizontal: int, vertical: int):
-        """Control a single leg's dove movement"""
-        logger.info(f"move: dove_control_leg({leg_id}, {horizontal}, {vertical})")
+    def move(self, step_input: int, speed: int, command: str) -> None:
+        """Execute a movement sequence.
         
-        leg = self.LEG_MAP[leg_id]
+        Args:
+            step_input: Current step in sequence (1-4)
+            speed: Movement speed
+            command: Movement command (no, left, right)
+        """
+        logger.debug(f"Moving - step: {step_input}, speed: {speed}, command: {command}")
         
-        if leg['direction']:
-            self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] + horizontal)
-        else:
-            self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] - horizontal)
-
-        if leg['height']:
-            self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] + vertical)
-        else:
-            self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] - vertical)
-
-    def move(self, step_input: int, speed: int, command: str):
-        """Execute a movement sequence"""
-        logger.info(f"move: move({step_input}, {speed}, {command})")
-
         step_I = step_input
         step_II = step_input + 2
-
         if step_II > 4:
             step_II = step_II - 4
+            
         if speed == 0:
             return
 
         if command == 'no':
-            self.control_leg('right_1', step_I, speed)
-            self.control_leg('left_2', step_I, speed)
-            self.control_leg('right_3', step_I, speed)
+            # First tripod: right_I (back right), left_II (middle left), right_III (front right)
+            self.control_leg('right_I', step_I, speed)
+            self.control_leg('left_II', step_I, speed)
+            self.control_leg('right_III', step_I, speed)
 
-            self.control_leg('left_1', step_II, speed)
-            self.control_leg('right_2', step_II, speed)
-            self.control_leg('left_3', step_II, speed)
+            # Second tripod: left_I (front left), right_II (middle right), left_III (back left)
+            self.control_leg('left_I', step_II, speed)
+            self.control_leg('right_II', step_II, speed)
+            self.control_leg('left_III', step_II, speed)
         elif command == 'left':
-            self.control_leg('right_1', step_I, speed)
-            self.control_leg('left_2', step_I, -speed)
-            self.control_leg('right_3', step_I, speed)
-
-            self.control_leg('left_1', step_II, -speed)
-            self.control_leg('right_2', step_II, speed)
-            self.control_leg('left_3', step_II, -speed)
+            self.control_leg('right_I', step_I, speed)
+            self.control_leg('left_II', step_I, -speed)
+            self.control_leg('right_III', step_I, speed)
+            self.control_leg('left_I', step_II, -speed)
+            self.control_leg('right_II', step_II, speed)
+            self.control_leg('left_III', step_II, -speed)
         elif command == 'right':
-            self.control_leg('right_1', step_I, -speed)
-            self.control_leg('left_2', step_I, speed)
-            self.control_leg('right_3', step_I, -speed)
+            self.control_leg('right_I', step_I, -speed)
+            self.control_leg('left_II', step_I, speed)
+            self.control_leg('right_III', step_I, -speed)
+            self.control_leg('left_I', step_II, speed)
+            self.control_leg('right_II', step_II, -speed)
+            self.control_leg('left_III', step_II, speed)
 
-            self.control_leg('left_1', step_II, speed)
-            self.control_leg('right_2', step_II, -speed)
-            self.control_leg('left_3', step_II, speed)
+    def dove(self, step_input: int, speed: int, timeLast: float, dpi: int, command: str) -> None:
+        """Execute a dove movement sequence.
+        
+        Args:
+            step_input: Current step in sequence (1-4)
+            speed: Movement speed
+            timeLast: Time to sleep between movements
+            dpi: Steps per movement
+            command: Movement command (no, left, right)
+        """
+        logger.debug(f"Dove movement - step: {step_input}, speed: {speed}, command: {command}")
+        
+        def dove_control_leg(leg_id: str, horizontal: int, vertical: int) -> None:
+            """Control a single leg's dove movement."""
+            leg = self.LEG_MAP[leg_id]
+            
+            if leg['direction']:
+                self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] + horizontal)
+            else:
+                self.sc.set_servo_pwm(leg['horiz'], leg['pwm_h'] - horizontal)
 
-    def dove(self, step_input: int, speed: int, timeLast: float, dpi: int, command: str):
-        """Execute a dove movement sequence"""
-        logger.info(f"move: dove({step_input}, {speed}, {timeLast}, {dpi}, {command})")
-        step_I = step_input
+            if leg['height']:
+                self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] + vertical)
+            else:
+                self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] - vertical)
+        
         step_II = step_input + 2
-
         if step_II > 4:
             step_II = step_II - 4
 
@@ -288,162 +361,166 @@ class LegsMovement:
                     if self.move_stu and command == 'no':
                         speed_II = speed_I
                         speed_I = speed - speed_I
-                        self.dove_control_leg('left_1', -speed_I, 3 * speed_II)
-                        self.dove_control_leg('right_2', -speed_I, 3 * speed_II)
-                        self.dove_control_leg('left_3', -speed_I, 3 * speed_II)
+                        dove_control_leg('left_I', -speed_I, 3 * speed_II)
+                        dove_control_leg('right_II', -speed_I, 3 * speed_II)
+                        dove_control_leg('left_III', -speed_I, 3 * speed_II)
 
-                        self.dove_control_leg('right_1', speed_I, -10)
-                        self.dove_control_leg('left_2', speed_I, -10)
-                        self.dove_control_leg('right_3', speed_I, -10)
+                        dove_control_leg('right_I', speed_I, -10)
+                        dove_control_leg('left_II', speed_I, -10)
+                        dove_control_leg('right_III', speed_I, -10)
                         time.sleep(timeLast / dpi)
-                    else:
-                        pass
-
-                    if command == 'left':
+                    elif command == 'left':
                         speed_II = speed_I
                         speed_I = speed - speed_I
-                        self.dove_control_leg('left_1', speed_I, 3 * speed_II)
-                        self.dove_control_leg('right_2', -speed_I, 3 * speed_II)
-                        self.dove_control_leg('left_3', speed_I, 3 * speed_II)
+                        dove_control_leg('left_I', speed_I, 3 * speed_II)
+                        dove_control_leg('right_II', -speed_I, 3 * speed_II)
+                        dove_control_leg('left_III', speed_I, 3 * speed_II)
 
-                        self.dove_control_leg('right_1', speed_I, -10)
-                        self.dove_control_leg('left_2', -speed_I, -10)
-                        self.dove_control_leg('right_3', speed_I, -10)
+                        dove_control_leg('right_I', speed_I, -10)
+                        dove_control_leg('left_II', -speed_I, -10)
+                        dove_control_leg('right_III', speed_I, -10)
                         time.sleep(timeLast / dpi)
                     elif command == 'right':
                         speed_II = speed_I
                         speed_I = speed - speed_I
-                        self.dove_control_leg('left_1', -speed_I, 3 * speed_II)
-                        self.dove_control_leg('right_2', speed_I, 3 * speed_II)
-                        self.dove_control_leg('left_3', -speed_I, 3 * speed_II)
+                        dove_control_leg('left_I', -speed_I, 3 * speed_II)
+                        dove_control_leg('right_II', speed_I, 3 * speed_II)
+                        dove_control_leg('left_III', -speed_I, 3 * speed_II)
 
-                        self.dove_control_leg('right_1', -speed_I, -10)
-                        self.dove_control_leg('left_2', speed_I, -10)
-                        self.dove_control_leg('right_3', -speed_I, -10)
+                        dove_control_leg('right_I', -speed_I, -10)
+                        dove_control_leg('left_II', speed_I, -10)
+                        dove_control_leg('right_III', -speed_I, -10)
                         time.sleep(timeLast / dpi)
-                    else:
-                        pass
 
                     if self.move_stu == 0 and command == 'no':
                         break
-
+            
             elif step_input == 2:
-                # Similar pattern for step_input == 2
                 for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
                     if self.move_stu and command == 'no':
                         speed_II = speed_I
                         speed_I = speed - speed_I
-                        self.dove_control_leg('left_1', speed_II, 3 * (speed - speed_II))
-                        self.dove_control_leg('right_2', speed_II, 3 * (speed - speed_II))
-                        self.dove_control_leg('left_3', speed_II, 3 * (speed - speed_II))
+                        dove_control_leg('left_I', speed_II, 3 * (speed - speed_II))
+                        dove_control_leg('right_II', speed_II, 3 * (speed - speed_II))
+                        dove_control_leg('left_III', speed_II, 3 * (speed - speed_II))
 
-                        self.dove_control_leg('right_1', -speed_II, -10)
-                        self.dove_control_leg('left_2', -speed_II, -10)
-                        self.dove_control_leg('right_3', -speed_II, -10)
+                        dove_control_leg('right_I', -speed_II, -10)
+                        dove_control_leg('left_II', -speed_II, -10)
+                        dove_control_leg('right_III', -speed_II, -10)
                         time.sleep(timeLast / dpi)
-                    # ... continue with left/right commands similar to step_input == 1
-
+                    # Similar patterns for left/right commands
+            
             elif step_input == 3:
-                # Similar pattern for step_input == 3
                 for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
                     if self.move_stu and command == 'no':
                         speed_II = speed_I
                         speed_I = speed - speed_I
-                        self.dove_control_leg('left_1', speed_I, -10)
-                        self.dove_control_leg('right_2', speed_I, -10)
-                        self.dove_control_leg('left_3', speed_I, -10)
+                        dove_control_leg('left_I', speed_I, -10)
+                        dove_control_leg('right_II', speed_I, -10)
+                        dove_control_leg('left_III', speed_I, -10)
 
-                        self.dove_control_leg('right_1', -speed_I, 3 * speed_II)
-                        self.dove_control_leg('left_2', -speed_I, 3 * speed_II)
-                        self.dove_control_leg('right_3', -speed_I, 3 * speed_II)
+                        dove_control_leg('right_I', -speed_I, 3 * speed_II)
+                        dove_control_leg('left_II', -speed_I, 3 * speed_II)
+                        dove_control_leg('right_III', -speed_I, 3 * speed_II)
                         time.sleep(timeLast / dpi)
-                    # ... continue with left/right commands similar to step_input == 1
-
+                    # Similar patterns for left/right commands
+            
             elif step_input == 4:
-                # Similar pattern for step_input == 4
                 for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
                     if self.move_stu and command == 'no':
                         speed_II = speed_I
                         speed_I = speed - speed_I
-                        self.dove_control_leg('left_1', -speed_II, -10)
-                        self.dove_control_leg('right_2', -speed_II, -10)
-                        self.dove_control_leg('left_3', -speed_II, -10)
+                        dove_control_leg('left_I', -speed_II, -10)
+                        dove_control_leg('right_II', -speed_II, -10)
+                        dove_control_leg('left_III', -speed_II, -10)
 
-                        self.dove_control_leg('right_1', speed_II, 3 * (speed - speed_II))
-                        self.dove_control_leg('left_2', speed_II, 3 * (speed - speed_II))
-                        self.dove_control_leg('right_3', speed_II, 3 * (speed - speed_II))
+                        dove_control_leg('right_I', speed_II, 3 * (speed - speed_II))
+                        dove_control_leg('left_II', speed_II, 3 * (speed - speed_II))
+                        dove_control_leg('right_III', speed_II, 3 * (speed - speed_II))
                         time.sleep(timeLast / dpi)
-                    # ... continue with left/right commands similar to step_input == 1
+                    # Similar patterns for left/right commands
 
-    def _move_thread(self):
-        """Internal movement thread function"""
+    def _move_thread(self) -> None:
+        """Internal movement thread function."""
         if not self.steadyMode:
-            if self.direction_command == 'forward' and self.turn_command == 'no':
+            logger.debug(f"Movement state - Direction: {self.direction_command}, Turn: {self.turn_command}, Step: {self.step_set}")
+            
+            if self.direction_command in ['forward', 'backward']:
+                speed = self.DOVE_SPEED if self.direction_command == 'forward' else -self.DOVE_SPEED
                 if self.SmoothMode:
-                    self.dove(self.step_set, self.DOVE_SPEED, 0.001, self.DPI, 'no')
-                    self.step_set += 1
-                    if self.step_set == 5:
-                        self.step_set = 1
+                    logger.debug(f"Smooth {self.direction_command} movement - Speed: {speed}, Step: {self.step_set}")
+                    self.dove(self.step_set, speed, 0.001, self.DPI, 'no')
                 else:
-                    self.move(self.step_set, 35, 'no')
+                    speed = 35 if self.direction_command == 'forward' else -35
+                    logger.debug(f"Normal {self.direction_command} movement - Speed: {speed}, Step: {self.step_set}")
+                    self.move(self.step_set, speed, 'no')
                     time.sleep(0.1)
-                    self.step_set += 1
-                    if self.step_set == 5:
-                        self.step_set = 1
-
-            elif self.direction_command == 'backward' and self.turn_command == 'no':
+                
+                self.step_set = (self.step_set % 4) + 1
+                
+            elif self.turn_command in ['left', 'right']:
                 if self.SmoothMode:
-                    self.dove(self.step_set, self.DOVE_SPEED * -1, 0.001, self.DPI, 'no')
-                    self.step_set += 1
-                    if self.step_set == 5:
-                        self.step_set = 1
-                else:
-                    self.move(self.step_set, -35, 'no')
-                    time.sleep(0.1)
-                    self.step_set += 1
-                    if self.step_set == 5:
-                        self.step_set = 1
-
-            if self.turn_command != 'no':
-                if self.SmoothMode:
+                    logger.debug(f"Smooth {self.turn_command} turn - Step: {self.step_set}")
                     self.dove(self.step_set, 35, 0.001, self.DPI, self.turn_command)
-                    self.step_set += 1
-                    if self.step_set == 5:
-                        self.step_set = 1
                 else:
+                    logger.debug(f"Normal {self.turn_command} turn - Step: {self.step_set}")
                     self.move(self.step_set, 35, self.turn_command)
                     time.sleep(0.1)
-                    self.step_set += 1
-                    if self.step_set == 5:
-                        self.step_set = 1
-
-            if self.turn_command == 'no' and self.direction_command == 'stand':
+                
+                self.step_set = (self.step_set % 4) + 1
+                
+            elif self.direction_command == 'stand':
+                logger.debug("Moving to stand position")
                 self.stand()
                 self.step_set = 1
         else:
+            logger.debug("Steady mode active")
             self.steady_X()
-            self.steady()
+            if hasattr(self, 'mpu_sensor') and self.mpu_sensor is not None:
+                self.steady(self.mpu_sensor)
+            else:
+                logger.warning("No MPU sensor available for steady mode")
 
-    def stand(self):
-        """Put robot in standing position"""
-        logger.info("move: stand()")
-        for i in range(12):
-            self.sc.set_servo_pwm(i, 300)
-
-    def ctrl_range(self, raw: float, max_genout: float, min_genout: float) -> int:
-        """Control the range of a value"""
-        if raw > max_genout:
-            raw_output = max_genout
-        elif raw < min_genout:
-            raw_output = min_genout
-        else:
-            raw_output = raw
-        return int(raw_output)
-
-    def steady(self, mpu_sensor):
-        """Maintain steady position using MPU sensor"""
-        logger.info("move: steady()")
+    def steady_X(self) -> None:
+        """Adjust X-axis balance for steady mode."""
+        # Front legs
+        front_left = self.LEG_MAP['left_I']
+        front_right = self.LEG_MAP['right_III']
         
+        # Middle legs
+        middle_left = self.LEG_MAP['left_II']
+        middle_right = self.LEG_MAP['right_II']
+        
+        # Back legs
+        back_left = self.LEG_MAP['left_III']
+        back_right = self.LEG_MAP['right_I']
+        
+        # Left side
+        if front_left['direction']:
+            self.sc.set_servo_pwm(front_left['horiz'], front_left['pwm_h'] + self.steady_X_set)
+            self.sc.set_servo_pwm(middle_left['horiz'], middle_left['pwm_h'])
+            self.sc.set_servo_pwm(back_left['horiz'], back_left['pwm_h'] - self.steady_X_set)
+        else:
+            self.sc.set_servo_pwm(front_left['horiz'], front_left['pwm_h'] - self.steady_X_set)
+            self.sc.set_servo_pwm(middle_left['horiz'], middle_left['pwm_h'])
+            self.sc.set_servo_pwm(back_left['horiz'], back_left['pwm_h'] + self.steady_X_set)
+
+        # Right side
+        if front_right['direction']:
+            self.sc.set_servo_pwm(front_right['horiz'], front_right['pwm_h'] + self.steady_X_set)
+            self.sc.set_servo_pwm(middle_right['horiz'], middle_right['pwm_h'])
+            self.sc.set_servo_pwm(back_right['horiz'], back_right['pwm_h'] - self.steady_X_set)
+        else:
+            self.sc.set_servo_pwm(front_right['horiz'], front_right['pwm_h'] - self.steady_X_set)
+            self.sc.set_servo_pwm(middle_right['horiz'], middle_right['pwm_h'])
+            self.sc.set_servo_pwm(back_right['horiz'], back_right['pwm_h'] + self.steady_X_set)
+
+    def steady(self, mpu_sensor) -> None:
+        """Maintain steady position using MPU sensor.
+        
+        Args:
+            mpu_sensor: MPU6050 sensor instance for reading accelerometer data
+        """
         accelerometer_data = mpu_sensor.get_accel_data()
         X = accelerometer_data['x']
         X = self.kalman_filter_X.kalman(X)
@@ -459,145 +536,82 @@ class LegsMovement:
         # Apply steady adjustments to each leg
         for leg_id in self.LEG_MAP:
             if leg_id.startswith('left'):
-                if leg_id == 'left_1':
+                if leg_id == 'left_I':
                     input_val = self.ctrl_range((self.X_fix_output + self.Y_fix_output), 
                                              self.steady_range_Max, self.steady_range_Min)
-                elif leg_id == 'left_2':
+                elif leg_id == 'left_II':
                     input_val = self.ctrl_range((abs(self.X_fix_output * 0.5) + self.Y_fix_output), 
                                              self.steady_range_Max, self.steady_range_Min)
-                else:  # left_3
+                else:  # left_III
                     input_val = self.ctrl_range((-self.X_fix_output + self.Y_fix_output), 
                                              self.steady_range_Max, self.steady_range_Min)
             else:  # right legs
-                if leg_id == 'right_3':
+                if leg_id == 'right_III':
                     input_val = self.ctrl_range((self.X_fix_output - self.Y_fix_output), 
                                              self.steady_range_Max, self.steady_range_Min)
-                elif leg_id == 'right_2':
+                elif leg_id == 'right_II':
                     input_val = self.ctrl_range((abs(-self.X_fix_output * 0.5) - self.Y_fix_output), 
                                              self.steady_range_Max, self.steady_range_Min)
-                else:  # right_1
+                else:  # right_I
                     input_val = self.ctrl_range((-self.X_fix_output - self.Y_fix_output), 
                                              self.steady_range_Max, self.steady_range_Min)
             
             self.control_leg(leg_id, 0, 35, input_val)
 
-    def release(self):
-        """Release all servos to neutral position"""
-        logger.info("move: release()")
-        for i in range(16):
-            self.sc.set_servo_pwm(i, 300)
+    def ctrl_range(self, raw: float, max_genout: float, min_genout: float) -> int:
+        """Control the range of a value.
+        
+        Args:
+            raw: Raw input value
+            max_genout: Maximum allowed value
+            min_genout: Minimum allowed value
+            
+        Returns:
+            Value clamped to the specified range
+        """
+        if raw > max_genout:
+            raw_output = max_genout
+        elif raw < min_genout:
+            raw_output = min_genout
+        else:
+            raw_output = raw
+        return int(raw_output)
 
-    def clean_all(self):
-        """Clean up all servo positions"""
-        logger.info("move: clean_all()")
+    def stand(self) -> None:
+        """Put robot in standing position."""
+        logger.info("Moving to standing position")
+        for leg_name, leg_config in self.config.items():
+            if leg_name != 'limits' and isinstance(leg_config, dict) and 'channels' in leg_config:
+                channels = leg_config['channels']
+                center = leg_config['center_position']
+                self.sc.set_servo_pwm(channels['horizontal'], center['horizontal'])
+                self.sc.set_servo_pwm(channels['vertical'], center['vertical'])
+
+    def release(self) -> None:
+        """Release all servos to neutral position."""
+        logger.info("Releasing servos to neutral position")
+        for leg_name, leg_config in self.config.items():
+            if leg_name != 'limits' and isinstance(leg_config, dict) and 'channels' in leg_config:
+                channels = leg_config['channels']
+                center = leg_config['center_position']
+                self.sc.set_servo_pwm(channels['horizontal'], center['horizontal'])
+                self.sc.set_servo_pwm(channels['vertical'], center['vertical'])
+
+    def clean_all(self) -> None:
+        """Clean up all servo positions."""
+        logger.info("Cleaning up servo positions")
         self.release()
 
-    def destroy(self):
-        """Cleanup before destroying the instance"""
-        logger.info("move: destroy()")
+    def destroy(self) -> None:
+        """Cleanup before destroying the instance."""
+        logger.info("Destroying LegsMovement instance")
         self.clean_all()
 
-    def look_up(self, wiggle: int = None):
-        """Move camera up"""
-        logger.info(f"move: look_up({wiggle if wiggle else self.look_wiggle})")
-        if wiggle is None:
-            wiggle = self.look_wiggle
-            
-        if self.Up_Down_direction:
-            self.Up_Down_input += wiggle
-            self.Up_Down_input = self.ctrl_range(self.Up_Down_input, self.Up_Down_Max, self.Up_Down_Min)
-        else:
-            self.Up_Down_input -= wiggle
-            self.Up_Down_input = self.ctrl_range(self.Up_Down_input, self.Up_Down_Max, self.Up_Down_Min)
-        self.sc.set_servo_pwm(13, self.Up_Down_input)
-
-    def look_down(self, wiggle: int = None):
-        """Move camera down"""
-        logger.info(f"move: look_down({wiggle if wiggle else self.look_wiggle})")
-        if wiggle is None:
-            wiggle = self.look_wiggle
-            
-        if self.Up_Down_direction:
-            self.Up_Down_input -= wiggle
-            self.Up_Down_input = self.ctrl_range(self.Up_Down_input, self.Up_Down_Max, self.Up_Down_Min)
-        else:
-            self.Up_Down_input += wiggle
-            self.Up_Down_input = self.ctrl_range(self.Up_Down_input, self.Up_Down_Max, self.Up_Down_Min)
-        self.sc.set_servo_pwm(13, self.Up_Down_input)
-
-    def look_left(self, wiggle: int = None):
-        """Move camera left"""
-        logger.info(f"move: look_left({wiggle if wiggle else self.look_wiggle})")
-        if wiggle is None:
-            wiggle = self.look_wiggle
-            
-        if self.Left_Right_direction:
-            self.Left_Right_input += wiggle
-            self.Left_Right_input = self.ctrl_range(self.Left_Right_input, self.Left_Right_Max, self.Left_Right_Min)
-        else:
-            self.Left_Right_input -= wiggle
-            self.Left_Right_input = self.ctrl_range(self.Left_Right_input, self.Left_Right_Max, self.Left_Right_Min)
-        self.sc.set_servo_pwm(12, self.Left_Right_input)
-
-    def look_right(self, wiggle: int = None):
-        """Move camera right"""
-        logger.info(f"move: look_right({wiggle if wiggle else self.look_wiggle})")
-        if wiggle is None:
-            wiggle = self.look_wiggle
-            
-        if self.Left_Right_direction:
-            self.Left_Right_input -= wiggle
-            self.Left_Right_input = self.ctrl_range(self.Left_Right_input, self.Left_Right_Max, self.Left_Right_Min)
-        else:
-            self.Left_Right_input += wiggle
-            self.Left_Right_input = self.ctrl_range(self.Left_Right_input, self.Left_Right_Max, self.Left_Right_Min)
-        self.sc.set_servo_pwm(12, self.Left_Right_input)
-
-    def look_home(self):
-        """Reset camera to home position"""
-        logger.info("move: look_home()")
-        self.sc.set_servo_pwm(13, 300)
-        self.sc.set_servo_pwm(12, 300)
-        self.Left_Right_input = 300
-        self.Up_Down_input = 300
-
-    def steadyTest(self):
-        """Test steady mode functionality"""
-        logger.info("move: steadyTest()")
-        if self.leftSide_direction:
-            self.sc.set_servo_pwm(0, self.init_pwms[0] + self.steady_X_set)
-            self.sc.set_servo_pwm(2, self.init_pwms[2])
-            self.sc.set_servo_pwm(4, self.init_pwms[4] - self.steady_X_set)
-        else:
-            self.sc.set_servo_pwm(0, self.init_pwms[0] + self.steady_X_set)
-            self.sc.set_servo_pwm(2, self.init_pwms[2])
-            self.sc.set_servo_pwm(4, self.init_pwms[4] - self.steady_X_set)
-
-        if self.rightSide_direction:
-            self.sc.set_servo_pwm(10, self.init_pwms[10] + self.steady_X_set)
-            self.sc.set_servo_pwm(8, self.init_pwms[8])
-            self.sc.set_servo_pwm(6, self.init_pwms[6] - self.steady_X_set)
-        else:
-            self.sc.set_servo_pwm(10, self.init_pwms[10] - self.steady_X_set)
-            self.sc.set_servo_pwm(8, self.init_pwms[8])
-            self.sc.set_servo_pwm(6, self.init_pwms[6] + self.steady_X_set)
-
-        while True:
-            left_H = self.steady_range_Min
-            right_H = self.steady_range_Max
-            
-            for leg_id in ['left_1', 'left_2', 'left_3']:
-                self.control_leg(leg_id, 0, 35, left_H)
-            for leg_id in ['right_1', 'right_2', 'right_3']:
-                self.control_leg(leg_id, 0, 35, right_H)
-
-            time.sleep(1)
-
-            left_H = 130
-            right_H = -40
-            for leg_id in ['left_1', 'left_2', 'left_3']:
-                self.control_leg(leg_id, 0, 35, left_H)
-            for leg_id in ['right_1', 'right_2', 'right_3']:
-                self.control_leg(leg_id, 0, 35, right_H)
-
-            time.sleep(1)
+    def set_mpu_sensor(self, sensor) -> None:
+        """Set the MPU sensor for steady mode.
+        
+        Args:
+            sensor: MPU6050 sensor instance
+        """
+        self.mpu_sensor = sensor
+        logger.info("MPU sensor set for steady mode")

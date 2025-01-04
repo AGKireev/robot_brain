@@ -43,8 +43,8 @@
           "max": 500
         },
         "vertical": {
-          "min": 270,
-          "max": 500
+          "min": 210,
+          "max": 400
         }
       },
       "channels": {
