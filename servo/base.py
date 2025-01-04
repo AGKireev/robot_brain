@@ -311,12 +311,29 @@ class ServoCtrl(threading.Thread):
         """Execute wiggle movement for a single servo."""
         logger.info(f"Starting wiggle movement for servo {self.wiggle_id}")
         while self.running.is_set():
-            delta = self.wiggle_direction * self.sc_speed[self.wiggle_id] / (1 / self.sc_delay)
-            self.buffer_positions[self.wiggle_id] += delta * self.sc_direction[self.wiggle_id]
-            self.current_positions[self.wiggle_id] = int(round(self.buffer_positions[self.wiggle_id]))
-            logger.debug(f"Wiggle update - Servo: {self.wiggle_id}, Position: {self.current_positions[self.wiggle_id]}")
-            self.set_servo_pwm(self.wiggle_id, self.current_positions[self.wiggle_id])
-            time.sleep(self.sc_delay - self.sc_move_time)
+            try:
+                delta = self.wiggle_direction * self.sc_speed[self.wiggle_id] / (1 / self.sc_delay)
+                new_pos = self.buffer_positions[self.wiggle_id] + delta * self.sc_direction[self.wiggle_id]
+                
+                # Check if we would exceed limits
+                if new_pos > self.max_positions[self.wiggle_id]:
+                    logger.info(f"Servo {self.wiggle_id} reached maximum position {self.max_positions[self.wiggle_id]}")
+                    self.pause()
+                    break
+                elif new_pos < self.min_positions[self.wiggle_id]:
+                    logger.info(f"Servo {self.wiggle_id} reached minimum position {self.min_positions[self.wiggle_id]}")
+                    self.pause()
+                    break
+                
+                self.buffer_positions[self.wiggle_id] = new_pos
+                self.current_positions[self.wiggle_id] = int(round(new_pos))
+                logger.debug(f"Wiggle update - Servo: {self.wiggle_id}, Position: {self.current_positions[self.wiggle_id]}")
+                self.set_servo_pwm(self.wiggle_id, self.current_positions[self.wiggle_id])
+                time.sleep(self.sc_delay - self.sc_move_time)
+            except Exception as e:
+                logger.error(f"Error in wiggle movement: {e}")
+                self.pause()
+                break
 
     def stop_wiggle(self) -> None:
         """Stop wiggle movement and update position."""
