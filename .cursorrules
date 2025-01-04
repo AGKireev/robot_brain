@@ -11,11 +11,14 @@ left_I -<forward>-- right_III
 left_II ---<BODY>--- right_II
 left_III -<Backward>- right_I
 
-            pos=1
-           /     \
-          /       \
-         /         \
-    pos=2---pos=3---pos=4
+== A single leg movement ==
+Servos start from default position.
+For a forward movement vertical servo goes up while horizontal servo goes forward. And then vertical servo goes down while horizontal servo goes backward.
+pos=1
+/ \
+ / \
+ / \
+ pos=2---pos=3---pos=4
 
 === Legs servos (PWM 0-11) ===
 Front is where the robot is facing and where the camera is.
