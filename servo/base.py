@@ -74,6 +74,17 @@ class ServoCtrl(threading.Thread):
         self.pwm_channels = []
         self.init_positions = {}
         
+        # Initialize control arrays first
+        self.sc_direction = {}
+        self.goal_positions = {}
+        self.current_positions = {}
+        self.buffer_positions = {}
+        self.last_positions = {}
+        self.ing_goal = {}
+        self.min_positions = {}
+        self.max_positions = {}
+        self.sc_speed = {}
+        
         # Initialize servos based on group
         if servo_group == 'legs':
             for leg_name, leg_data in servo_config['legs'].items():
@@ -101,16 +112,16 @@ class ServoCtrl(threading.Thread):
             for channel in self.pwm_channels
         }
         
-        # Initialize control arrays only for channels we use
-        self.sc_direction = {channel: 1 for channel in self.pwm_channels}
-        self.goal_positions = {channel: 300 for channel in self.pwm_channels}
-        self.current_positions = {channel: 300 for channel in self.pwm_channels}
-        self.buffer_positions = {channel: 300.0 for channel in self.pwm_channels}
-        self.last_positions = {channel: 300 for channel in self.pwm_channels}
-        self.ing_goal = {channel: 300 for channel in self.pwm_channels}
-        self.min_positions = {channel: 100 for channel in self.pwm_channels}
-        self.max_positions = {channel: 520 for channel in self.pwm_channels}
-        self.sc_speed = {channel: 0 for channel in self.pwm_channels}
+        # Initialize default values for control arrays
+        for channel in self.pwm_channels:
+            self.goal_positions[channel] = 300
+            self.current_positions[channel] = 300
+            self.buffer_positions[channel] = 300.0
+            self.last_positions[channel] = 300
+            self.ing_goal[channel] = 300
+            self.min_positions[channel] = 100
+            self.max_positions[channel] = 520
+            self.sc_speed[channel] = 0
 
         self.ctrl_range_max: int = 520
         self.ctrl_range_min: int = 100
@@ -131,6 +142,10 @@ class ServoCtrl(threading.Thread):
 
         self.running = threading.Event()
         self.running.clear()
+        
+        logger.info(f"ServoCtrl initialized for group '{servo_group}' with channels: {self.pwm_channels}")
+        logger.debug(f"Initial positions: {self.init_positions}")
+        logger.debug(f"Servo directions: {self.sc_direction}")
 
     def pause(self) -> None:
         logger.info("ServoCtrl: pause")

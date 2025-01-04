@@ -2,6 +2,9 @@ This project is for a hexapod robot.
 It is written in Python.
 When working with the project code, please do not remove the commented code!
 
+The main script in the project is:
+main.py
+
 == Description of servos which this robot has ==
 === Leg Servos (PWM 0-11) ===
 Front is where the robot is facing and where the camera is.
