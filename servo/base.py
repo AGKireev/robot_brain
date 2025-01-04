@@ -88,14 +88,26 @@ class ServoCtrl(threading.Thread):
         # Initialize servos based on group
         if servo_group == 'legs':
             for leg_name, leg_data in servo_config['legs'].items():
+                if leg_name == 'limits':  # Skip the limits entry
+                    continue
                 channels = leg_data['channels']
                 positions = leg_data['center_position']
                 directions = leg_data['direction']
-                self.pwm_channels.extend([channels['horizontal'], channels['vertical']])
-                self.init_positions[channels['horizontal']] = positions['horizontal']
-                self.init_positions[channels['vertical']] = positions['vertical']
-                self.sc_direction[channels['horizontal']] = directions['horizontal']
-                self.sc_direction[channels['vertical']] = directions['vertical']
+                
+                # Add both horizontal and vertical channels for this leg
+                h_channel = channels['horizontal']
+                v_channel = channels['vertical']
+                self.pwm_channels.extend([h_channel, v_channel])
+                
+                # Set initial positions
+                self.init_positions[h_channel] = positions['horizontal']
+                self.init_positions[v_channel] = positions['vertical']
+                
+                # Set directions
+                self.sc_direction[h_channel] = directions['horizontal']
+                self.sc_direction[v_channel] = directions['vertical']
+                
+                logger.debug(f"Initialized leg {leg_name} - Channels: {h_channel},{v_channel}")
         else:  # camera
             channels = servo_config['camera']['channels']
             positions = servo_config['camera']['center_position']
@@ -105,12 +117,14 @@ class ServoCtrl(threading.Thread):
             self.init_positions[channels['vertical']] = positions['vertical']
             self.sc_direction[channels['horizontal']] = directions['horizontal']
             self.sc_direction[channels['vertical']] = directions['vertical']
+            logger.debug(f"Initialized camera servos - Channels: {self.pwm_channels}")
         
         # Create servo instances only for the channels we need
         self.servos = {
             channel: create_servo(channel)
             for channel in self.pwm_channels
         }
+        logger.info(f"Created servo instances for channels: {list(self.servos.keys())}")
         
         # Initialize default values for control arrays
         for channel in self.pwm_channels:
