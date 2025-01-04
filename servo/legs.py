@@ -419,20 +419,20 @@ class LegsMovement:
         if step_II > 4:
             step_II = step_II - 4
 
-        if speed > 0:
+        if speed > 0:  # Forward movement
             if step_input == 1:
                 for speed_I in range(0, (speed + int(speed / dpi)), int(speed / dpi)):
                     if self.move_stu and command == 'no':
                         speed_II = speed_I
                         speed_I = speed - speed_I
                         # First tripod moves up and forward
-                        dove_control_leg('left_I', -speed_I, 3 * speed_II)
-                        dove_control_leg('right_II', -speed_I, 3 * speed_II)
-                        dove_control_leg('left_III', -speed_I, 3 * speed_II)
+                        dove_control_leg('left_I', speed_I, 3 * speed_II)
+                        dove_control_leg('right_II', speed_I, 3 * speed_II)
+                        dove_control_leg('left_III', speed_I, 3 * speed_II)
                         # Second tripod stays down and moves backward
-                        dove_control_leg('right_I', speed_I, -10)
-                        dove_control_leg('left_II', speed_I, -10)
-                        dove_control_leg('right_III', speed_I, -10)
+                        dove_control_leg('right_I', -speed_I, -10)
+                        dove_control_leg('left_II', -speed_I, -10)
+                        dove_control_leg('right_III', -speed_I, -10)
                         time.sleep(timeLast / dpi)
                     elif command == 'left':
                         speed_II = speed_I
