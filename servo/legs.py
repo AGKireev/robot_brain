@@ -117,11 +117,7 @@ class LegsMovement:
                 'vert': channels['vertical'],
                 'pwm_h': positions['horizontal'],
                 'pwm_v': positions['vertical'],
-                'direction': (
-                    1 - directions['horizontal']
-                    if scheme_name in ('right_I', 'right_II', 'right_III')
-                    else directions['horizontal']
-                ),
+                'direction': directions['horizontal'],  # Use horizontal direction as main direction
                 'height': directions['vertical']  # Use vertical direction for height
             }
         
