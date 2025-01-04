@@ -1,4 +1,5 @@
 # IMPORTANT!
+
 Build was tested on:
 Adeept RaspClaws robot
 Raspberry Pi 5 8Gb
@@ -9,13 +10,16 @@ I used: 1x 2S Lipo Battery 50C 2200mAh 7.4V Short Battery
 Discharge rate matters! Or the Raspberry will halt when the motors are running at full!
 
 # How to set env
+
 cd /home/USERNAME
 python3 -m venv robot_brain_env
 source robot_brain_env/bin/activate
 pip install -r requirements.txt
 deactivate
 sudo nano /etc/systemd/system/bot_brain_webserver.service
------------------
+
+---
+
 [Unit]
 Description=Brain Web Server
 After=network.target
@@ -27,7 +31,9 @@ ExecStart=/home/USERNAME/bot_brain_env/bin/python3 /home/USERNAME/bot_brain/webS
 
 [Install]
 WantedBy=multi-user.target
------------------
+
+---
+
 Save the file
 sudo systemctl daemon-reload
 sudo systemctl restart robot_brain_webserver.service
@@ -36,18 +42,21 @@ sudo systemctl status robot_brain_webserver.service
 # How to set/reset service
 
 # How to Fix led errors for Raspberry 5
+
 # @from https://github.com/jgarff/rpi_ws281x/issues/528
+
 # @from https://github.com/rpi-ws281x/rpi-ws281x-python/releases
+
 sudo apt update
 sudo apt install linux-headers-$(uname -r) device-tree-compiler raspi-utils
 git clone --branch pi5 https://github.com/jgarff/rpi_ws281x.git
-	cd rpi_ws281x
-	cd rp1_ws281x_pwm
+cd rpi_ws281x
+cd rp1_ws281x_pwm
 make
 ./dts.sh
-	sudo insmod ./rp1_ws281x_pwm.ko pwm_channel=0
-	sudo dtoverlay -d . rp1_ws281x_pwm
-	sudo pinctrl set 12 a0 pn
+sudo insmod ./rp1_ws281x_pwm.ko pwm_channel=0
+sudo dtoverlay -d . rp1_ws281x_pwm
+sudo pinctrl set 12 a0 pn
 sudo apt install cmake -y
 cmake --version
 cd ..
@@ -62,33 +71,31 @@ sudo ./setup_ws281x.sh
 sudo reboot
 
 -- ORIGINAL ROOT INSTRUCTIONS --
-First of all, the program should be done in the SD card, including writing the Raspberry Pi system, 
-downloading and installing the Rasptank program. 
+First of all, the program should be done in the SD card, including writing the Raspberry Pi system,
+downloading and installing the Rasptank program.
 
-Pay attention to the case sensitivity during process of git clone . The specific operation process 
-is in the document and manual. It will automatically start up at boot after the program is successfully installed. 
+Pay attention to the case sensitivity during process of git clone . The specific operation process
+is in the document and manual. It will automatically start up at boot after the program is successfully installed.
 
-You need to connect the driver board and the Raspberry Pi, and before turn it on, connect the servo with the driver board. 
-Wait until the servo rotates to specified position to assemble. 
+You need to connect the driver board and the Raspberry Pi, and before turn it on, connect the servo with the driver board.
+Wait until the servo rotates to specified position to assemble.
 
 The servo is 20 teeth and will have an error of less than 9° during the installation process, which is normal.
 
----------------------------------------------------------------------------------------------------------------------------
+---
 
 The .py program in the folder client is the program required on the PC.
 The .py program in the folder server is the program required on the robot.
 
 This instruction focuses on the programs in the folder server. When you encounter problems, you can refer to this description to solve the problem.
 
-
 1.What should I do if the robot does not automatically run the program when I turn it on?
-First cause: the program is not installed completely, probably  because the server connection of the dependent libraries needed is unstable, resulting in incomplete download of the dependent libraries.The full version of the program needs to install the appropriate dependencies to run properly.
-Second cause: Linux is case sensitive.The case sensitvity of the name when you clone from Github is different from the one of the autostart file of the default path. 
+First cause: the program is not installed completely, probably because the server connection of the dependent libraries needed is unstable, resulting in incomplete download of the dependent libraries.The full version of the program needs to install the appropriate dependencies to run properly.
+Second cause: Linux is case sensitive.The case sensitvity of the name when you clone from Github is different from the one of the autostart file of the default path.
 
 Solution: try the beta program - a program named serverTest.py in the folder server.
-If you need the beta program to run automatically  every time you boot, execute autorun.py - enter "2" to select the autorun beta - enter.
+If you need the beta program to run automatically every time you boot, execute autorun.py - enter "2" to select the autorun beta - enter.
 If you need to change to the full version of the autorun program every time you boot, execute autorun.py - enter "1" to select the full version of autorun - enter.
-
 
 2.What should I do if the servo is moving in the opposite direction?
 Cause: the servos were produced in different batches, the moving direction of them may be different.
@@ -96,46 +103,60 @@ Cause: the servos were produced in different batches, the moving direction of th
 Solution: We have reserved an interface for adjusting the direction of the servo in the program, which makes it much more easier to debug.
 All motion-related code is written in the program server/move.py.
 Enter the following command to open (note that it is not to execute) move.py and edit:
-	sudo  nano (path)/move.py
+sudo nano (path)/move.py
 After opening move.py, change the value of set_direction to 0 (the default is 1), then press ctrl+x to exit, press Y to save change, and press Enter to confirm.
 
-
 3. What should I do if the it fails to realize good self-stabilization?
-Cause: The IPD controler is used for self-stabilization. You need to input the appropriate PID parameters to achieve perfect stabilization. The PID parameters of each robot are different.
+   Cause: The IPD controler is used for self-stabilization. You need to input the appropriate PID parameters to achieve perfect stabilization. The PID parameters of each robot are different.
 
 Solution: If the reaction is slow, you can increase the P value appropriately (the line75 of move.py). If the reaction is too fast (or swing back and forth), you can reduce the P value appropriately.
 If the reaction speed is normal but there is overshoot, you need to increase the I value appropriately.
 The D value is differential and usually does not need to be changed for this product.
 
--- ORIGINAL SERVER INSTRUCTIONS --
-The .py program in the folder client is the program required on the PC.
-The .py program in the folder server is the program required on the robot.
+# Servo Configuration
 
-This instruction focuses on the programs in the folder server. When you encounter problems, you can refer to this description to solve the problem.
+The robot's servos are configured through the `config.json` file. This file contains all the necessary parameters for each servo, including:
 
+## Channel Mapping
 
-1.What should I do if the robot does not automatically run the program when I turn it on?
-First cause: the program is not installed completely, probably  because the server connection of the dependent libraries needed is unstable, resulting in incomplete download of the dependent libraries.The full version of the program needs to install the appropriate dependencies to run properly.
-Second cause: Linux is case sensitive.The case sensitvity of the name when you clone from Github is different from the one of the autostart file of the default path. 
+- Each servo is assigned a specific PWM channel number (0-15)
+- Channels are grouped by their function (legs and camera)
+- For legs, each has a horizontal (forward/backward) and vertical (up/down) servo
+- For camera, there are two servos for horizontal (left/right) and vertical (up/down) movement
 
-Solution: try the beta program - a program named serverTest.py in the folder server.
-If you need the beta program to run automatically  every time you boot, execute autorun.py - enter "2" to select the autorun beta - enter.
-If you need to change to the full version of the autorun program every time you boot, execute autorun.py - enter "1" to select the full version of autorun - enter.
+## Center Positions
 
+- Each servo has a center position (default: 300)
+- This is the position the servo moves to during initialization
+- Values range from 100 to 520, mapping to angles from 0° to 180°
 
-2.What should I do if the servo is moving in the opposite direction?
-Cause: the servos were produced in different batches, the moving direction of them may be different.
+## Servo Direction
 
-Solution: We have reserved an interface for adjusting the direction of the servo in the program, which makes it much more easier to debug.
-All motion-related code is written in the program server/move.py.
-Enter the following command to open (note that it is not to execute) move.py and edit:
-	sudo  nano (path)/move.py
-After opening move.py, change the value of set_direction to 0 (the default is 1), then press ctrl+x to exit, press Y to save change, and press Enter to confirm.
+- Each servo has a direction value (1 or -1)
+- Default is 1 for normal operation
+- Set to -1 to reverse the servo's direction if it's rotating inversely
+- This is useful when:
+  - A servo is mounted in a reversed orientation
+  - The movement direction needs to be inverted for logical control
 
+Example configuration:
 
-3. What should I do if the it fails to realize good self-stabilization?
-Cause: The IPD controler is used for self-stabilization. You need to input the appropriate PID parameters to achieve perfect stabilization. The PID parameters of each robot are different.
+```json
+{
+  "servos": {
+    "legs": {
+      "front_left": {
+        "channels": { "horizontal": 0, "vertical": 1 },
+        "center_position": { "horizontal": 300, "vertical": 300 },
+        "direction": { "horizontal": 1, "vertical": -1 } // Vertical servo reversed
+      }
+    }
+  }
+}
+```
 
-Solution: If the reaction is slow, you can increase the P value appropriately (the line75 of move.py). If the reaction is too fast (or swing back and forth), you can reduce the P value appropriately.
-If the reaction speed is normal but there is overshoot, you need to increase the I value appropriately.
-The D value is differential and usually does not need to be changed for this product.
+## PWM Value Range
+
+- Minimum: 100 (maps to 0 degrees)
+- Maximum: 520 (maps to 180 degrees)
+- Center: 300 (maps to 90 degrees)

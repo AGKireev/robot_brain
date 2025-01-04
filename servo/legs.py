@@ -1,7 +1,6 @@
 import time
 import threading
 import logging
-from typing import Optional
 
 from servo import base
 from system.kalman_filter import KalmanFilter
@@ -10,7 +9,7 @@ import PID
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class RobotMovement:
+class LegsMovement:
     def __init__(self, servo_ctrl: base.ServoCtrl):
         self.sc = servo_ctrl
         self.init_pwms = self.sc.init_positions.copy()

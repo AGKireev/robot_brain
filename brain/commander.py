@@ -4,9 +4,10 @@ import logging
 import json
 from typing import Dict, Any, Optional, Union, Callable
 
-from servo import move
+# from servo import legs, camera
 from system import info, config
-from servo.move import RobotMovement  # Update import
+from servo.legs import LegsMovement
+from servo.camera import CameraMovement
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,8 +20,7 @@ class Commander:
     def __init__(
             self,
             servo_legs,
-            servo_camera_lr,
-            servo_camera_ud,
+            servo_camera,
             light_strip,
             camera
     ):
@@ -28,18 +28,15 @@ class Commander:
         self.turn_command = None
 
         self.servo_legs = servo_legs
-        self.servo_camera_lr = servo_camera_lr
-        self.servo_camera_ud = servo_camera_ud
+        self.servo_camera = servo_camera
         self.light_strip = light_strip
         self.camera = camera
 
         # TODO: Is this correct use?
         self.init_pwms = json.loads(json.dumps(servo_legs.init_positions))
 
-        self.camera_moving_lr = False
-        self.camera_moving_ud = False
-
-        self.movement = RobotMovement(servo_legs)  # Create movement controller
+        self.legs_movement = LegsMovement(servo_legs)
+        self.camera_movement = CameraMovement(servo_camera)
 
     def process(self, data: str) -> Dict[str, Any]:
         """Process commands received from the WebSocket."""
@@ -94,20 +91,21 @@ class Commander:
             "stopCV": lambda: self._handle_camera_mode("stopCV"),
             
             # Movement mode commands
-            "KD": lambda: move.command("KD"),
-            "automaticOff": lambda: move.command("automaticOff"),
-            "automatic": lambda: move.command("automatic"),
+            "KD": lambda: self.legs_movement.command("KD"),
+            "automaticOff": lambda: self.legs_movement.command("automaticOff"),
+            "automatic": lambda: self.legs_movement.command("automatic"),
             
             # Light commands
             "police": lambda: self._handle_light("police"),
             "policeOff": lambda: self._handle_light("policeOff"),
             
             # Servo calibration commands
-            **{f"SiLeft{i}": lambda x=i: self._handle_servo_calibration("SiLeft", x) for i in range(16)},
-            **{f"SiRight{i}": lambda x=i: self._handle_servo_calibration("SiRight", x) for i in range(16)},
-            **{f"PWMMS{i}": lambda x=i: self._handle_servo_calibration("PWMMS", x) for i in range(16)},
-            "PWMINIT": lambda: self._handle_servo_calibration("PWMINIT"),
-            "PWMD": lambda: self._handle_servo_calibration("PWMD"),
+            # TODO: Must be refactored, as the config file structure changed!
+            # **{f"SiLeft{i}": lambda x=i: self._handle_servo_calibration("SiLeft", x) for i in range(16)},
+            # **{f"SiRight{i}": lambda x=i: self._handle_servo_calibration("SiRight", x) for i in range(16)},
+            # **{f"PWMMS{i}": lambda x=i: self._handle_servo_calibration("PWMMS", x) for i in range(16)},
+            # "PWMINIT": lambda: self._handle_servo_calibration("PWMINIT"),
+            # "PWMD": lambda: self._handle_servo_calibration("PWMD"),
 
             # Autonomous behavior commands
             "startAutonomous": self.start_autonomous_behavior,
@@ -134,39 +132,26 @@ class Commander:
         # Always reset turn command when changing direction
         self.turn_command = "no"
         self.direction_command = direction
-        self.movement.command(self.direction_command)  # Use movement instance
+        self.legs_movement.command(self.direction_command)  # Use legs_movement instance
 
     def _handle_turn(self, direction: str):
         """Handle turning commands (left, right, no)"""
         # Always reset direction command when turning
         self.direction_command = "no"
         self.turn_command = "no" if direction == "turn_stop" else direction
-        self.movement.command(self.turn_command)  # Updated to use movement instance
+        self.legs_movement.command(self.turn_command)  # Updated to use legs_movement instance
 
     def _handle_camera_look(self, direction: str):
         """Handle camera look commands."""
-        look_map = {
-            "left": self.movement.look_left,
-            "right": self.movement.look_right,
-            "up": self.movement.look_up,
-            "down": self.movement.look_down
-        }
-        
-        if direction not in look_map:
-            raise ValueError(f"Invalid camera direction: {direction}")
-        
-        look_map[direction]()
+        self.camera_movement.single_servo(direction)
 
     def _handle_camera_stop(self, axis: str):
         """Handle camera stop commands."""
-        if axis == "lr":
-            self.servo_camera_lr.stop_wiggle()
-        elif axis == "ud":
-            self.servo_camera_ud.stop_wiggle()
+        self.camera_movement.stop_movement(axis)
 
     def _handle_camera_home(self):
         """Reset camera position to home."""
-        self.movement.look_home()
+        self.camera_movement.look_home()
 
     def _handle_get_info(self):
         """Get system information."""
@@ -195,6 +180,9 @@ class Commander:
         """Handle servo calibration commands."""
         if servo_num is not None and not (0 <= servo_num < 16):
             raise ValueError(f"Invalid servo number: {servo_num}")
+        
+        # TODO: Must be refactored, as the config file structure changed!
+        raise NotImplementedError("Servo calibration commands are not implemented yet!")
 
         if command.startswith("Si"):
             adjustment = -1 if command == "SiLeft" else 1
@@ -242,10 +230,10 @@ class Commander:
                         self._handle_camera_look("right")
                         time.sleep(2)
                 
-                # Add obstacle avoidance using MPU6050 sensor data
-                if hasattr(self, 'sensor'):
-                    accel_data = self.sensor.get_accel_data()
-                    # Implement obstacle avoidance logic
+                # # Add obstacle avoidance using MPU6050 sensor data
+                # if hasattr(self, 'sensor'):
+                #     accel_data = self.sensor.get_accel_data()
+                #     # Implement obstacle avoidance logic
                     
                 time.sleep(0.1)  # Control loop rate
                 

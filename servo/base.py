@@ -56,29 +56,61 @@ pca.frequency = 50
 MIN_PULSE_US = 500  # 488
 MAX_PULSE_US = 2500 # 2538
 
-# Load initial servo positions from config
-pwm_config = config.read("pwm")
-init_positions = [pwm_config[f"init_pwm{i}"] for i in range(16)]
+# Load servo configuration
+servo_config = config.read("servos")
 
-# Create servo instances for all 16 channels
-servos = [servo.Servo(pca.channels[i], min_pulse=MIN_PULSE_US, max_pulse=MAX_PULSE_US) for i in range(16)]
+def create_servo(channel: int) -> servo.Servo:
+    """Create a servo instance for a given channel with proper PWM configuration."""
+    pwm = pca.channels[channel]
+    return servo.Servo(pwm, min_pulse=MIN_PULSE_US, max_pulse=MAX_PULSE_US)
 
 class ServoCtrl(threading.Thread):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, servo_group: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        # if the servo rotates inversely,
-        # just change the N-th number in the array to -1
-        # to reverse the direction
-        self.sc_direction: List[int] = [1] * 16
-        self.init_positions: List[int] = init_positions
-        self.goal_positions: List[int] = [300] * 16
-        self.current_positions: List[int] = [300] * 16
-        self.buffer_positions: List[float] = [300.0] * 16
-        self.last_positions: List[int] = [300] * 16
-        self.ing_goal: List[int] = [300] * 16
-        self.min_positions: List[int] = [100] * 16
-        self.max_positions: List[int] = [520] * 16
-        self.sc_speed: List[int] = [0] * 16
+        if servo_group not in servo_config:
+            raise ValueError(f"Invalid servo group: {servo_group}. Must be one of {list(servo_config.keys())}")
+        
+        self.servo_group = servo_group
+        self.pwm_channels = []
+        self.init_positions = {}
+        
+        # Initialize servos based on group
+        if servo_group == 'legs':
+            for leg_name, leg_data in servo_config['legs'].items():
+                channels = leg_data['channels']
+                positions = leg_data['center_position']
+                directions = leg_data['direction']
+                self.pwm_channels.extend([channels['horizontal'], channels['vertical']])
+                self.init_positions[channels['horizontal']] = positions['horizontal']
+                self.init_positions[channels['vertical']] = positions['vertical']
+                self.sc_direction[channels['horizontal']] = directions['horizontal']
+                self.sc_direction[channels['vertical']] = directions['vertical']
+        else:  # camera
+            channels = servo_config['camera']['channels']
+            positions = servo_config['camera']['center_position']
+            directions = servo_config['camera']['direction']
+            self.pwm_channels = [channels['horizontal'], channels['vertical']]
+            self.init_positions[channels['horizontal']] = positions['horizontal']
+            self.init_positions[channels['vertical']] = positions['vertical']
+            self.sc_direction[channels['horizontal']] = directions['horizontal']
+            self.sc_direction[channels['vertical']] = directions['vertical']
+        
+        # Create servo instances only for the channels we need
+        self.servos = {
+            channel: create_servo(channel)
+            for channel in self.pwm_channels
+        }
+        
+        # Initialize control arrays only for channels we use
+        self.sc_direction = {channel: 1 for channel in self.pwm_channels}
+        self.goal_positions = {channel: 300 for channel in self.pwm_channels}
+        self.current_positions = {channel: 300 for channel in self.pwm_channels}
+        self.buffer_positions = {channel: 300.0 for channel in self.pwm_channels}
+        self.last_positions = {channel: 300 for channel in self.pwm_channels}
+        self.ing_goal = {channel: 300 for channel in self.pwm_channels}
+        self.min_positions = {channel: 100 for channel in self.pwm_channels}
+        self.max_positions = {channel: 520 for channel in self.pwm_channels}
+        self.sc_speed = {channel: 0 for channel in self.pwm_channels}
 
         self.ctrl_range_max: int = 520
         self.ctrl_range_min: int = 100
@@ -109,29 +141,47 @@ class ServoCtrl(threading.Thread):
         self.running.set()
 
     def pwm_to_angle(self, pwm: int) -> int:
-        return int(max(0, min(int((pwm - self.ctrl_range_min) / (self.ctrl_range_max - self.ctrl_range_min) * self.angle_range), 180)))
+        """Convert PWM value (100-520) to angle (0-180)."""
+        angle = int(max(0, min(int((pwm - self.ctrl_range_min) / (self.ctrl_range_max - self.ctrl_range_min) * self.angle_range), 180)))
+        logger.debug(f"Converting PWM {pwm} to angle {angle}")
+        return angle
 
     def set_servo_pwm(self, channel: int, pwm: int) -> None:
+        """Set servo position using PWM value."""
+        if channel not in self.servos:
+            logger.error(f"Invalid channel {channel} for servo group {self.servo_group}")
+            raise ValueError(f"Channel {channel} not in servo group {self.servo_group}")
+            
         if self.min_positions[channel] <= pwm <= self.max_positions[channel]:
             angle = self.pwm_to_angle(pwm)
-            servos[channel].angle = angle
+            logger.debug(f"Setting servo {channel} to PWM {pwm} (angle: {angle}°)")
+            self.servos[channel].angle = angle
             self.current_positions[channel] = pwm
+            logger.info(f"Servo {channel} position updated - PWM: {pwm}, Angle: {angle}°")
         else:
-            logger.warning(f"PWM value {pwm} out of range for channel {channel}.")
+            logger.error(f"PWM value {pwm} out of range [{self.min_positions[channel]}, {self.max_positions[channel]}] for channel {channel}")
+            raise ValueError(f"PWM value {pwm} out of range for channel {channel}. Must be between {self.min_positions[channel]} and {self.max_positions[channel]}")
 
     def move_init(self, ids: Union[List[int], int, None] = None) -> None:
-        """
-        Initialize servos.
-        - ids=None: Initializes all servos.
-        - ids=list: Initializes specific servos.
-        - ids=int: Initializes a single servo.
-        """
-        if ids is None:  # Initialize all servos
-            ids = range(16)
+        """Initialize servos to their default positions."""
+        if ids is None:  # Initialize all servos in group
+            ids = list(self.pwm_channels)
+            logger.info(f"Initializing all servos in group {self.servo_group}: {ids}")
         elif isinstance(ids, int):  # Single servo
+            if ids not in self.pwm_channels:
+                logger.error(f"Invalid servo {ids} for group {self.servo_group}")
+                raise ValueError(f"Servo {ids} is not in the current servo group {self.servo_group}")
             ids = [ids]
+            logger.info(f"Initializing single servo {ids[0]}")
+        else:  # List of servos
+            invalid_servos = [i for i in ids if i not in self.pwm_channels]
+            if invalid_servos:
+                logger.error(f"Invalid servos {invalid_servos} for group {self.servo_group}")
+                raise ValueError(f"Servos {invalid_servos} are not in the current servo group {self.servo_group}")
+            logger.info(f"Initializing servos: {ids}")
 
         for i in ids:
+            logger.debug(f"Setting servo {i} to initial position {self.init_positions[i]}")
             self.set_servo_pwm(i, self.init_positions[i])
             self.last_positions[i] = self.init_positions[i]
             self.current_positions[i] = self.init_positions[i]
@@ -140,6 +190,7 @@ class ServoCtrl(threading.Thread):
 
         self.sc_mode = 'init'
         self.pause()
+        logger.info("Servo initialization complete")
 
     def set_init_position(self, id: int, init_input: int, move_to: bool = False) -> None:
         """
@@ -150,29 +201,34 @@ class ServoCtrl(threading.Thread):
             init_input (int): The new initial position (PWM value).
             move_to (bool): If True, moves the servo to the updated initial position immediately.
         """
-        if self.min_positions[id] <= init_input <= self.max_positions[id]:
-            self.init_positions[id] = init_input
-            if move_to:
-                self.set_servo_pwm(id, init_input)
-        else:
-            logger.error(f"Invalid initial position {init_input} for servo {id}.")
+        if id not in self.pwm_channels:
+            raise ValueError(f"Servo {id} is not in the current servo group {self.servo_group}")
+            
+        if not (self.min_positions[id] <= init_input <= self.max_positions[id]):
+            raise ValueError(f"Invalid initial position {init_input} for servo {id}. Must be between {self.min_positions[id]} and {self.max_positions[id]}")
+            
+        self.init_positions[id] = init_input
+        if move_to:
+            self.set_servo_pwm(id, init_input)
 
     def pos_update(self) -> None:
         self.goal_update = 1
-        for i in range(16):
-            self.last_positions[i] = self.current_positions[i]
+        for channel in self.pwm_channels:
+            self.last_positions[channel] = self.current_positions[channel]
         self.goal_update = 0
 
     def speed_update(self, ids: List[int], speeds: List[int]) -> None:
         for i, speed in zip(ids, speeds):
+            if i not in self.pwm_channels:
+                raise ValueError(f"Channel {i} not in servo group {self.servo_group}")
             self.sc_speed[i] = speed
 
     def move_auto(self) -> None:
-        for i in range(16):
-            self.ing_goal[i] = self.goal_positions[i]
+        for channel in self.pwm_channels:
+            self.ing_goal[channel] = self.goal_positions[channel]
 
         for step in range(self.sc_steps):
-            for channel in range(16):
+            for channel in self.pwm_channels:
                 if not self.goal_update:
                     delta = (self.goal_positions[channel] - self.last_positions[channel]) / self.sc_steps
                     self.current_positions[channel] = int(round(self.last_positions[channel] + delta * (step + 1)))
@@ -182,18 +238,18 @@ class ServoCtrl(threading.Thread):
         self.pause()
 
     def move_cert(self) -> None:
-        for i in range(16):
-            self.ing_goal[i] = self.goal_positions[i]
-            self.buffer_positions[i] = self.last_positions[i]
+        for channel in self.pwm_channels:
+            self.ing_goal[channel] = self.goal_positions[channel]
+            self.buffer_positions[channel] = self.last_positions[channel]
 
-        while self.current_positions != self.goal_positions:
-            for i in range(16):
-                if self.last_positions[i] < self.goal_positions[i]:
-                    self.buffer_positions[i] += self.sc_speed[i] / (1 / self.sc_delay)
-                elif self.last_positions[i] > self.goal_positions[i]:
-                    self.buffer_positions[i] -= self.sc_speed[i] / (1 / self.sc_delay)
-                self.current_positions[i] = int(round(self.buffer_positions[i]))
-                self.set_servo_pwm(i, self.current_positions[i])
+        while any(self.current_positions[channel] != self.goal_positions[channel] for channel in self.pwm_channels):
+            for channel in self.pwm_channels:
+                if self.last_positions[channel] < self.goal_positions[channel]:
+                    self.buffer_positions[channel] += self.sc_speed[channel] / (1 / self.sc_delay)
+                elif self.last_positions[channel] > self.goal_positions[channel]:
+                    self.buffer_positions[channel] -= self.sc_speed[channel] / (1 / self.sc_delay)
+                self.current_positions[channel] = int(round(self.buffer_positions[channel]))
+                self.set_servo_pwm(channel, self.current_positions[channel])
             time.sleep(self.sc_delay - self.sc_move_time)
         self.pos_update()
         self.pause()
@@ -208,6 +264,11 @@ class ServoCtrl(threading.Thread):
         self.sc_delay = delay
 
     def auto_speed(self, ids: List[int], angles: List[float]) -> None:
+        # Validate all IDs before making any changes
+        invalid_servos = [i for i in ids if i not in self.pwm_channels]
+        if invalid_servos:
+            raise ValueError(f"Servos {invalid_servos} are not in the current servo group {self.servo_group}")
+
         self.sc_mode = 'auto'
         self.goal_update = 1
         for i, angle in zip(ids, angles):
@@ -217,6 +278,11 @@ class ServoCtrl(threading.Thread):
         self.resume()
 
     def cert_speed(self, ids: List[int], angles: List[float], speeds: List[int]) -> None:
+        # Validate all IDs before making any changes
+        invalid_servos = [i for i in ids if i not in self.pwm_channels]
+        if invalid_servos:
+            raise ValueError(f"Servos {invalid_servos} are not in the current servo group {self.servo_group}")
+
         self.sc_mode = 'certain'
         self.goal_update = 1
         for i, angle in zip(ids, angles):
@@ -227,18 +293,29 @@ class ServoCtrl(threading.Thread):
         self.resume()
 
     def move_wiggle(self) -> None:
+        """Execute wiggle movement for a single servo."""
+        logger.info(f"Starting wiggle movement for servo {self.wiggle_id}")
         while self.running.is_set():
             delta = self.wiggle_direction * self.sc_speed[self.wiggle_id] / (1 / self.sc_delay)
             self.buffer_positions[self.wiggle_id] += delta * self.sc_direction[self.wiggle_id]
             self.current_positions[self.wiggle_id] = int(round(self.buffer_positions[self.wiggle_id]))
+            logger.debug(f"Wiggle update - Servo: {self.wiggle_id}, Position: {self.current_positions[self.wiggle_id]}")
             self.set_servo_pwm(self.wiggle_id, self.current_positions[self.wiggle_id])
             time.sleep(self.sc_delay - self.sc_move_time)
 
     def stop_wiggle(self) -> None:
+        """Stop wiggle movement and update position."""
+        logger.info(f"Stopping wiggle movement for servo {self.wiggle_id}")
         self.pause()
         self.pos_update()
 
     def single_servo(self, id: int, direction: int, speed: int) -> None:
+        """Control movement of a single servo."""
+        if id not in self.pwm_channels:
+            logger.error(f"Invalid servo {id} for group {self.servo_group}")
+            raise ValueError(f"Servo {id} is not in the current servo group {self.servo_group}")
+        
+        logger.info(f"Starting single servo movement - ID: {id}, Direction: {direction}, Speed: {speed}")
         self.wiggle_id = id
         self.wiggle_direction = direction
         self.sc_speed[id] = speed
@@ -246,6 +323,8 @@ class ServoCtrl(threading.Thread):
         self.resume()
 
     def move_angle(self, id: int, angle: float) -> None:
+        if id not in self.pwm_channels:
+            raise ValueError(f"Servo {id} is not in the current servo group {self.servo_group}")
         pwm = self.init_positions[id] + self.pwm_gen_out(angle) * self.sc_direction[id]
         self.current_positions[id] = max(self.min_positions[id], min(int(pwm), self.max_positions[id]))
         self.last_positions[id] = self.current_positions[id]
@@ -262,6 +341,8 @@ class ServoCtrl(threading.Thread):
             self.move_wiggle()
 
     def set_pwm(self, id: int, pwm: int) -> None:
+        if id not in self.pwm_channels:
+            raise ValueError(f"Servo {id} is not in the current servo group {self.servo_group}")
         self.last_positions[id] = pwm
         self.current_positions[id] = pwm
         self.buffer_positions[id] = float(pwm)
@@ -270,14 +351,12 @@ class ServoCtrl(threading.Thread):
         self.pause()
 
     def shutdown(self) -> None:
-        """
-        Gracefully shut down the servo controller.
-        """
-        logger.info("Shutting down ServoCtrl...")
+        """Gracefully shut down the servo controller."""
+        logger.info(f"Shutting down ServoCtrl for group {self.servo_group}...")
         self.pause()
-        for s in servos:
-            s.angle = None  # Disable all servos
-        pca.deinit()
+        for channel, servo in self.servos.items():
+            logger.debug(f"Disabling servo on channel {channel}")
+            servo.angle = None
         logger.info("ServoCtrl shut down successfully.")
 
     def run(self) -> None:

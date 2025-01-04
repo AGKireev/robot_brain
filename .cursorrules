@@ -1,0 +1,30 @@
+This project is for a hexapod robot.
+It is written in Python.
+When working with the project code, please do not remove the commented code!
+
+== Description of servos which this robot has ==
+=== Leg Servos (PWM 0-11) ===
+Front is where the robot is facing and where the camera is.
+Horizontal servos - move the leg forward and backward.
+Vertical servos - move the leg up and down.
+
+1. Left Side:
+
+- Front Left Leg 1: PWM 0 (horizontal), PWM 1 (vertical)
+- Middle Left Leg 2: PWM 2 (horizontal), PWM 3 (vertical)
+- Back Left Leg 3: PWM 4 (horizontal), PWM 5 (vertical)
+
+2. Right Side:
+
+- Front Right Leg 1: PWM 10 (horizontal), PWM 11 (vertical)
+- Middle Right Leg 2: PWM 8 (horizontal), PWM 9 (vertical)
+- Back Right Leg 3: PWM 6 (horizontal), PWM 7 (vertical)
+
+=== Camera Servos (PWM 12-13) ===
+
+1.  PWM 12: Camera Left/Right movement
+2.  PWM 13: Camera Up/Down movement
+
+=== Unused PWMs ===
+PWM 14: Not used in this code
+PWM 15: Not used in this code

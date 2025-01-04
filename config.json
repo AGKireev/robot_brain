@@ -1,20 +1,50 @@
 {
-    "pwm": {
-        "init_pwm0": 300,
-        "init_pwm1": 300,
-        "init_pwm2": 300,
-        "init_pwm3": 300,
-        "init_pwm4": 300,
-        "init_pwm5": 300,
-        "init_pwm6": 300,
-        "init_pwm7": 300,
-        "init_pwm8": 300,
-        "init_pwm9": 300,
-        "init_pwm10": 300,
-        "init_pwm11": 300,
-        "init_pwm12": 300,
-        "init_pwm13": 300,
-        "init_pwm14": 300,
-        "init_pwm15": 300
+  "servos": {
+    "legs": {
+      "front_left": {
+        "channels": { "horizontal": 0, "vertical": 1 },
+        "center_position": { "horizontal": 300, "vertical": 300 },
+        "direction": { "horizontal": 1, "vertical": 1 }
+      },
+      "middle_left": {
+        "channels": { "horizontal": 2, "vertical": 3 },
+        "center_position": { "horizontal": 300, "vertical": 300 },
+        "direction": { "horizontal": 1, "vertical": 1 }
+      },
+      "back_left": {
+        "channels": { "horizontal": 4, "vertical": 5 },
+        "center_position": { "horizontal": 300, "vertical": 300 },
+        "direction": { "horizontal": 1, "vertical": 1 }
+      },
+      "back_right": {
+        "channels": { "horizontal": 6, "vertical": 7 },
+        "center_position": { "horizontal": 300, "vertical": 300 },
+        "direction": { "horizontal": 1, "vertical": 1 }
+      },
+      "middle_right": {
+        "channels": { "horizontal": 8, "vertical": 9 },
+        "center_position": { "horizontal": 300, "vertical": 300 },
+        "direction": { "horizontal": 1, "vertical": 1 }
+      },
+      "front_right": {
+        "channels": { "horizontal": 10, "vertical": 11 },
+        "center_position": { "horizontal": 300, "vertical": 300 },
+        "direction": { "horizontal": 1, "vertical": 1 }
+      }
+    },
+    "camera": {
+      "channels": {
+        "horizontal": 12,
+        "vertical": 13
+      },
+      "center_position": {
+        "horizontal": 300,
+        "vertical": 300
+      },
+      "direction": {
+        "horizontal": 1,
+        "vertical": 1
+      }
     }
+  }
 }

@@ -28,8 +28,7 @@ logger = logging.getLogger(__name__)
 class Robot:
 	def __init__(self):
 		self.servo_legs = None
-		self.servo_camera_lr = None
-		self.servo_camera_ud = None
+		self.servo_camera = None
 		self.camera = None
 		self.light_strip = None
 		self.api = None
@@ -46,18 +45,18 @@ class Robot:
 		logger.info("Robot.sensor initialized")
 
 		try:
-			self.servo_legs = ServoCtrl()
+			self.servo_legs = ServoCtrl(servo_group='legs')
 			self.servo_legs.move_init()
+			self.servo_legs.start()
 		except Exception as e:
 			logger.error(f"Robot.Failed to initialize Legs Servos: {e}")
 			sys.exit(1)
 		logger.info("Robot.legs servos initialized")
 
 		try:
-			self.servo_camera_lr = ServoCtrl()
-			self.servo_camera_lr.start()
-			self.servo_camera_ud = ServoCtrl()
-			self.servo_camera_ud.start()
+			self.servo_camera = ServoCtrl(servo_group='camera')
+			self.servo_camera.move_init()
+			self.servo_camera.start()
 		except Exception as e:
 			logger.error(f"Robot.Failed to initialize Camera Servos: {e}")
 			sys.exit(1)
@@ -85,8 +84,7 @@ class Robot:
 		try:
 			commander = Commander(
 				servo_legs=self.servo_legs,
-				servo_camera_lr=self.servo_camera_lr,
-				servo_camera_ud=self.servo_camera_ud,
+				servo_camera=self.servo_camera,
 				light_strip=self.light_strip,
 				camera=self.camera
 			)
@@ -111,7 +109,7 @@ class Robot:
 			except Exception as e:
 				logger.error(f"Robot.Error shutting down LightStrip: {e}")
 
-		for c in [self.servo_legs, self.servo_camera_lr, self.servo_camera_ud]:
+		for c in [self.servo_legs, self.servo_camera]:
 			if c:
 				try:
 					c.shutdown()
