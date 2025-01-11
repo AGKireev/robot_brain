@@ -101,14 +101,12 @@ class Commander:
             "stars": lambda: self._handle_light("stars"),
             "rainbow": lambda: self._handle_light("rainbow"),
             "breath": lambda: self._handle_light_breath(task),
-            
+
             # Servo calibration commands
-            # TODO: Must be refactored, as the config file structure changed!
-            # **{f"SiLeft{i}": lambda x=i: self._handle_servo_calibration("SiLeft", x) for i in range(16)},
-            # **{f"SiRight{i}": lambda x=i: self._handle_servo_calibration("SiRight", x) for i in range(16)},
-            # **{f"PWMMS{i}": lambda x=i: self._handle_servo_calibration("PWMMS", x) for i in range(16)},
-            # "PWMINIT": lambda: self._handle_servo_calibration("PWMINIT"),
-            # "PWMD": lambda: self._handle_servo_calibration("PWMD"),
+            "servo_set": lambda: self._handle_servo_calibration_set(task),
+            "servo_save": lambda: self._handle_servo_calibration_save(task),
+            "servo_center": lambda: self._handle_servo_calibration_center(task),
+            "servo_reset": lambda: self._handle_servo_calibration_reset(task),
 
             # Autonomous behavior commands
             "startAutonomous": self.start_autonomous_behavior,
@@ -212,6 +210,62 @@ class Commander:
         elif command == "PWMD":
             reset_pwm = {f"init_pwm{i}": 300 for i in range(0, 16)}
             config.write("pwm", None, reset_pwm)
+
+    def _handle_servo_calibration_set(self, task: dict) -> Dict[str, Any]:
+        """Handle servo_set calibration command."""
+        required_fields = {"servos", "direction", "steps"}
+        if not all(field in task for field in required_fields):
+            raise ValueError(f"Missing required fields. Need: {required_fields}")
+            
+        servos = task["servos"]
+        direction = task["direction"]
+        steps = task["steps"]
+        
+        if not isinstance(servos, list):
+            raise ValueError("servos must be a list of servo IDs")
+        if not servos:
+            raise ValueError("servos list cannot be empty")
+            
+        return self.servo_legs.adjust_servo_positions(servos, direction, steps)
+
+    def _handle_servo_calibration_save(self, task: dict) -> Dict[str, Any]:
+        """Handle servo_save calibration command."""
+        if "servos" not in task:
+            raise ValueError("Missing required field: servos")
+            
+        servos = task["servos"]
+        if not isinstance(servos, list):
+            raise ValueError("servos must be a list of servo IDs")
+        if not servos:
+            raise ValueError("servos list cannot be empty")
+            
+        return self.servo_legs.save_current_positions(servos)
+
+    def _handle_servo_calibration_center(self, task: dict) -> Dict[str, Any]:
+        """Handle servo_center calibration command."""
+        if "servos" not in task:
+            raise ValueError("Missing required field: servos")
+            
+        servos = task["servos"]
+        if not isinstance(servos, list):
+            raise ValueError("servos must be a list of servo IDs")
+        if not servos:
+            raise ValueError("servos list cannot be empty")
+            
+        return self.servo_legs.center_servos(servos)
+
+    def _handle_servo_calibration_reset(self, task: dict) -> Dict[str, Any]:
+        """Handle servo_reset calibration command."""
+        if "servos" not in task:
+            raise ValueError("Missing required field: servos")
+            
+        servos = task["servos"]
+        if not isinstance(servos, list):
+            raise ValueError("servos must be a list of servo IDs")
+        if not servos:
+            raise ValueError("servos list cannot be empty")
+            
+        return self.servo_legs.reset_servos(servos)
 
     def start_autonomous_behavior(self):
         """Start autonomous robot behavior."""

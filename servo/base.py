@@ -36,7 +36,7 @@
 import time
 import threading
 import logging
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Dict, Any
 from board import SCL, SDA
 import busio
 import adafruit_pca9685
@@ -209,6 +209,168 @@ class ServoCtrl(threading.Thread):
         else:
             logger.error(f"PWM value {pwm} out of range [{self.min_positions[channel]}, {self.max_positions[channel]}] for channel {channel}")
             raise ValueError(f"PWM value {pwm} out of range for channel {channel}. Must be between {self.min_positions[channel]} and {self.max_positions[channel]}")
+
+    def validate_servo_ids(self, servo_ids: List[int]) -> None:
+        """Validate that all servo IDs exist in the current group."""
+        invalid_servos = [i for i in servo_ids if i not in self.pwm_channels]
+        if invalid_servos:
+            raise ValueError(f"Servos {invalid_servos} are not in the current servo group {self.servo_group}")
+
+    def adjust_servo_positions(self, servo_ids: List[int], direction: int, steps: int) -> Dict[str, Any]:
+        """
+        Adjust servo positions by the specified number of steps in the given direction.
+        
+        Args:
+            servo_ids: List of servo IDs to adjust
+            direction: 1 for increment, -1 for decrement
+            steps: Number of steps to adjust (positive integer)
+            
+        Returns:
+            Dict containing operation status and current positions
+        """
+        MAX_STEPS = 20  # Safety limit for maximum steps at once
+        
+        # Validate inputs
+        self.validate_servo_ids(servo_ids)
+        if direction not in (-1, 1):
+            raise ValueError("Direction must be 1 (increment) or -1 (decrement)")
+        if not isinstance(steps, int) or steps <= 0:
+            raise ValueError("Steps must be a positive integer")
+        if steps > MAX_STEPS:
+            raise ValueError(f"Steps cannot exceed {MAX_STEPS}")
+            
+        # Check if movement would exceed limits for any servo
+        positions_after = {}
+        for servo_id in servo_ids:
+            new_pos = self.current_positions[servo_id] + (direction * steps)
+            if not (self.min_positions[servo_id] <= new_pos <= self.max_positions[servo_id]):
+                raise ValueError(
+                    f"Movement would exceed limits for servo {servo_id}. "
+                    f"Current: {self.current_positions[servo_id]}, "
+                    f"After: {new_pos}, "
+                    f"Limits: [{self.min_positions[servo_id]}, {self.max_positions[servo_id]}]"
+                )
+            positions_after[servo_id] = new_pos
+            
+        # Apply the changes
+        for servo_id, new_pos in positions_after.items():
+            self.set_servo_pwm(servo_id, new_pos)
+            
+        return {
+            "status": "ok",
+            "positions": {str(k): v for k, v in self.current_positions.items() if k in servo_ids}
+        }
+
+    def save_current_positions(self, servo_ids: List[int]) -> Dict[str, Any]:
+        """
+        Save current positions of specified servos as their new center positions in config.
+        
+        Args:
+            servo_ids: List of servo IDs to save
+            
+        Returns:
+            Dict containing operation status
+        """
+        self.validate_servo_ids(servo_ids)
+        
+        # Update config with new center positions
+        for servo_id in servo_ids:
+            current_pos = self.current_positions[servo_id]
+            
+            # Find the leg and axis (horizontal/vertical) for this servo
+            for leg_name, leg_data in servo_config['legs'].items():
+                if leg_name == 'limits':
+                    continue
+                    
+                channels = leg_data['channels']
+                if channels['horizontal'] == servo_id:
+                    leg_data['center_position']['horizontal'] = current_pos
+                    break
+                elif channels['vertical'] == servo_id:
+                    leg_data['center_position']['vertical'] = current_pos
+                    break
+            else:
+                # Check camera servos if not found in legs
+                camera_channels = servo_config['camera']['channels']
+                if camera_channels['horizontal'] == servo_id:
+                    servo_config['camera']['center_position']['horizontal'] = current_pos
+                elif camera_channels['vertical'] == servo_id:
+                    servo_config['camera']['center_position']['vertical'] = current_pos
+                    
+        # Save updated config
+        config.write("servos", None, servo_config)
+        
+        return {
+            "status": "ok",
+            "saved_positions": {str(k): v for k, v in self.current_positions.items() if k in servo_ids}
+        }
+
+    def center_servos(self, servo_ids: List[int]) -> Dict[str, Any]:
+        """
+        Move specified servos to their center positions from config.
+        
+        Args:
+            servo_ids: List of servo IDs to center
+            
+        Returns:
+            Dict containing operation status and new positions
+        """
+        self.validate_servo_ids(servo_ids)
+        
+        # Move each servo to its center position
+        for servo_id in servo_ids:
+            self.set_servo_pwm(servo_id, self.init_positions[servo_id])
+            
+        return {
+            "status": "ok",
+            "positions": {str(k): v for k, v in self.current_positions.items() if k in servo_ids}
+        }
+
+    def reset_servos(self, servo_ids: List[int]) -> Dict[str, Any]:
+        """
+        Reset specified servos to factory default center position (300).
+        
+        Args:
+            servo_ids: List of servo IDs to reset
+            
+        Returns:
+            Dict containing operation status and new positions
+        """
+        self.validate_servo_ids(servo_ids)
+        DEFAULT_CENTER = 300
+        
+        # Move servos to default center and update config
+        for servo_id in servo_ids:
+            # Update servo position
+            self.set_servo_pwm(servo_id, DEFAULT_CENTER)
+            
+            # Update config
+            for leg_name, leg_data in servo_config['legs'].items():
+                if leg_name == 'limits':
+                    continue
+                    
+                channels = leg_data['channels']
+                if channels['horizontal'] == servo_id:
+                    leg_data['center_position']['horizontal'] = DEFAULT_CENTER
+                    break
+                elif channels['vertical'] == servo_id:
+                    leg_data['center_position']['vertical'] = DEFAULT_CENTER
+                    break
+            else:
+                # Check camera servos
+                camera_channels = servo_config['camera']['channels']
+                if camera_channels['horizontal'] == servo_id:
+                    servo_config['camera']['center_position']['horizontal'] = DEFAULT_CENTER
+                elif camera_channels['vertical'] == servo_id:
+                    servo_config['camera']['center_position']['vertical'] = DEFAULT_CENTER
+        
+        # Save updated config
+        config.write("servos", None, servo_config)
+        
+        return {
+            "status": "ok",
+            "positions": {str(k): v for k, v in self.current_positions.items() if k in servo_ids}
+        }
 
     def move_init(self, ids: Union[List[int], int, None] = None) -> None:
         """Initialize servos to their default positions."""
