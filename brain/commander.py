@@ -98,6 +98,9 @@ class Commander:
             # Light commands
             "police": lambda: self._handle_light("police"),
             "off": lambda: self._handle_light("off"),
+            "stars": lambda: self._handle_light("stars"),
+            "rainbow": lambda: self._handle_light("rainbow"),
+            "breath": lambda: self._handle_light_breath(task),
             
             # Servo calibration commands
             # TODO: Must be refactored, as the config file structure changed!
@@ -178,6 +181,16 @@ class Commander:
             self.light_strip.police()
         elif command == "off":
             self.light_strip.off()
+        elif command == "stars":
+            self.light_strip.stars()
+        elif command == "rainbow":
+            self.light_strip.rainbow()
+
+    def _handle_light_breath(self, task: dict) -> None:
+        """Handle breath mode with RGB values."""
+        if not all(k in task for k in ["r", "g", "b"]):
+            raise ValueError("Breath command requires r, g, b values")
+        self.light_strip.breath(task["r"], task["g"], task["b"])
 
     def _handle_servo_calibration(self, command: str, servo_num: Optional[int] = None) -> None:
         """Handle servo calibration commands."""
