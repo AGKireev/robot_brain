@@ -2,9 +2,9 @@ import threading
 import time
 import logging
 import json
-from typing import Dict, Any, Optional, Union, Callable
+from typing import Dict, Any, Optional, Union, Callable, List
 
-# from servo import legs, camera
+from servo import legs, camera, base
 from system import info, config
 from servo.legs import LegsMovement
 from servo.camera import CameraMovement
@@ -190,26 +190,22 @@ class Commander:
             raise ValueError("Breath command requires r, g, b values")
         self.light_strip.breath(task["r"], task["g"], task["b"])
 
-    def _handle_servo_calibration(self, command: str, servo_num: Optional[int] = None) -> None:
-        """Handle servo calibration commands."""
-        if servo_num is not None and not (0 <= servo_num < 16):
-            raise ValueError(f"Invalid servo number: {servo_num}")
+    def _get_servo_controller(self, servo_ids: List[int]) -> base.ServoCtrl:
+        """
+        Get the appropriate servo controller for the given servo IDs.
+        Raises ValueError if servos are from different groups.
+        """
+        # Camera servo IDs are 12 and 13
+        camera_servos = {12, 13}
+        leg_servos = set(range(12))  # 0-11 are leg servos
         
-        # TODO: Must be refactored, as the config file structure changed!
-        raise NotImplementedError("Servo calibration commands are not implemented yet!")
-
-        if command.startswith("Si"):
-            adjustment = -1 if command == "SiLeft" else 1
-            self.init_pwms[servo_num] = self.init_pwms[servo_num] + adjustment
-            self.servo_legs.set_init_position(servo_num, self.init_pwms[servo_num], True)
-        elif command == "PWMMS":
-            config.write("pwm", f"init_pwm{servo_num}", self.init_pwms[servo_num])
-        elif command == "PWMINIT":
-            for i in range(0, 16):
-                self.servo_legs.set_init_position(i, self.init_pwms[i], True)
-        elif command == "PWMD":
-            reset_pwm = {f"init_pwm{i}": 300 for i in range(0, 16)}
-            config.write("pwm", None, reset_pwm)
+        servo_set = set(servo_ids)
+        if servo_set.issubset(camera_servos):
+            return self.servo_camera
+        elif servo_set.issubset(leg_servos):
+            return self.servo_legs
+        else:
+            raise ValueError("Cannot mix leg and camera servos in the same command")
 
     def _handle_servo_calibration_set(self, task: dict) -> Dict[str, Any]:
         """Handle servo_set calibration command."""
@@ -226,7 +222,8 @@ class Commander:
         if not servos:
             raise ValueError("servos list cannot be empty")
             
-        return self.servo_legs.adjust_servo_positions(servos, direction, steps)
+        servo_ctrl = self._get_servo_controller(servos)
+        return servo_ctrl.adjust_servo_positions(servos, direction, steps)
 
     def _handle_servo_calibration_save(self, task: dict) -> Dict[str, Any]:
         """Handle servo_save calibration command."""
@@ -239,7 +236,8 @@ class Commander:
         if not servos:
             raise ValueError("servos list cannot be empty")
             
-        return self.servo_legs.save_current_positions(servos)
+        servo_ctrl = self._get_servo_controller(servos)
+        return servo_ctrl.save_current_positions(servos)
 
     def _handle_servo_calibration_center(self, task: dict) -> Dict[str, Any]:
         """Handle servo_center calibration command."""
@@ -252,7 +250,8 @@ class Commander:
         if not servos:
             raise ValueError("servos list cannot be empty")
             
-        return self.servo_legs.center_servos(servos)
+        servo_ctrl = self._get_servo_controller(servos)
+        return servo_ctrl.center_servos(servos)
 
     def _handle_servo_calibration_reset(self, task: dict) -> Dict[str, Any]:
         """Handle servo_reset calibration command."""
@@ -265,7 +264,8 @@ class Commander:
         if not servos:
             raise ValueError("servos list cannot be empty")
             
-        return self.servo_legs.reset_servos(servos)
+        servo_ctrl = self._get_servo_controller(servos)
+        return servo_ctrl.reset_servos(servos)
 
     def start_autonomous_behavior(self):
         """Start autonomous robot behavior."""
