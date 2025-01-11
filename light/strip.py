@@ -144,7 +144,7 @@ class LightStrip(threading.Thread):
             self.strip.show()
 
 
-    def pause(self):
+    def off(self):
         self.lightMode = 'none'
         self.set_color(0,0,0)
         self.__flag.clear()
@@ -216,7 +216,7 @@ class LightStrip(threading.Thread):
                     self.strip.setPixelColor(i, self.wheel(pixel_index & 255))
                 self.strip.show()
                 time.sleep(0.02)
-        self.pause()
+        self.off()
 
     def wheel(self, pos):
         """Generate rainbow colors across 0-255 positions."""
@@ -282,7 +282,7 @@ class LightStrip(threading.Thread):
             # Sleep to allow smooth updates
             time.sleep(UPDATE_INTERVAL)
 
-        self.pause()
+        self.off()
 
     # def frontLight(self, switch):
     #     if switch == 'on':
@@ -334,7 +334,7 @@ class LightStrip(threading.Thread):
 
     def light_change(self):
         if self.lightMode == 'none':
-            self.pause()
+            self.off()
         elif self.lightMode == 'police':
             self.police_processing()
         elif self.lightMode == 'breath':

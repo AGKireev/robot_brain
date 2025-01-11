@@ -105,7 +105,7 @@ class Robot:
 		logger.info("Robot.shutdown_components")
 		if self.light_strip:
 			try:
-				self.light_strip.pause()
+				self.light_strip.off()
 			except Exception as e:
 				logger.error(f"Robot.Error shutting down LightStrip: {e}")
 

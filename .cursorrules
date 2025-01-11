@@ -1,47 +1,97 @@
-This project is for a hexapod robot.
-It is written in Python.
-When working with the project code, please do not remove the commented code!
+This project is a backend and a brain for a hexapod robot.
 
-The main script in the project is:
-main.py
+1. Hardware Components
+   a. Robot Platform:
+   Adeept RaspClaws hexapod robot
+   Raspberry Pi 5 (8GB)
+   Camera Module 3 (IMX708)
+   2S LiPo Battery (7.4V, 2200mAh, 50C)
+   b. Servos:
+   12 leg servos (6 legs × 2 servos each)
+   2 camera servos (pan/tilt)
+   Uses PCA9685 PWM controller
+   c. Lighting:
+   WS281x LED strip (16 LEDs)
+   GPIO pin 12 for control
 
-== Description of servos which this robot has ==
-=== Legs scheme ===
-left_I -<forward>-- right_III
-left_II ---<BODY>--- right_II
-left_III -<Backward>- right_I
+2. Major Software Blocks
+   Brain/Commander:
 
-== A single leg movement ==
-Servos start from default position.
-For a forward movement vertical servo goes up while horizontal servo goes forward. And then vertical servo goes down while horizontal servo goes backward.
-pos=1
-/ \
- / \
- / \
- pos=2---pos=3---pos=4
+- Central control logic
+- Movement coordination
+- Command processing
+  Web API:
+- FastAPI-based interface
+- WebSocket support
+- Camera streaming
+  Movement Control:
+- Leg movement patterns
+- Camera positioning
+- Stabilization system
+  Vision System:
+- OpenCV integration
+- Color detection
+- Motion tracking
 
-=== Legs servos (PWM 0-11) ===
-Front is where the robot is facing and where the camera is.
-Horizontal servos - move the leg forward and backward.
-Vertical servos - move the leg up and down.
+3. Basic project info.
+   It is written in Python.
+   a. Main Control Thread (main.py)
+   Initializes all components
+   Handles graceful shutdown
+   Runs web server (FastAPI)
+   b. Light Control Thread (light/strip.py):
+   Controls WS281x LED strip
+   Handles different lighting modes (police, breath, rainbow, stars)
+   c. Camera Thread (camera/base.py):
+   Manages camera feed
+   Handles frame processing
+   Supports computer vision features
+   d. Servo Control Thread (servo/base.py):
+   Controls all servos (legs and camera)
+   Manages movement coordination
+   Handles servo calibration
 
-1. Left Side:
+4. Description of servos which this robot has
+   a. Legs scheme:
+   left_I -<forward>-- right_III
+   left_II ---<BODY>--- right_II
+   left_III -<Backward>- right_I
 
-- Front Left Leg (left_I): PWM 0 (horizontal), PWM 1 (vertical)
-- Middle Left Leg (left_II): PWM 2 (horizontal), PWM 3 (vertical)
-- Back Left Leg (left_III): PWM 4 (horizontal), PWM 5 (vertical)
+   b. A single leg movement:
+   Servos start from default position.
+   For a forward movement vertical servo goes up while horizontal servo goes forward. And then vertical servo goes down while horizontal servo goes backward.
+   pos=1
+   / \
+    / \
+    / \
+    pos=2---pos=3---pos=4
 
-2. Right Side:
+   c. Legs servos (PWM 0-11)
+   Front is where the robot is facing and where the camera is.
+   Horizontal servos - move the leg forward and backward.
+   Vertical servos - move the leg up and down.
 
-- Front Right Leg (right_III): PWM 10 (horizontal), PWM 11 (vertical)
-- Middle Right Leg (right_II): PWM 8 (horizontal), PWM 9 (vertical)
-- Back Right Leg (right_I): PWM 6 (horizontal), PWM 7 (vertical)
+   Left Side:
 
-=== Camera Servos (PWM 12-13) ===
+   - Front Left Leg (left_I): PWM 0 (horizontal), PWM 1 (vertical)
+   - Middle Left Leg (left_II): PWM 2 (horizontal), PWM 3 (vertical)
+   - Back Left Leg (left_III): PWM 4 (horizontal), PWM 5 (vertical)
 
-1.  PWM 12: Camera Left/Right movement
-2.  PWM 13: Camera Up/Down movement
+   Right Side:
 
-=== Unused PWMs ===
-PWM 14: Not used in this code
-PWM 15: Not used in this code
+   - Front Right Leg (right_III): PWM 10 (horizontal), PWM 11 (vertical)
+   - Middle Right Leg (right_II): PWM 8 (horizontal), PWM 9 (vertical)
+   - Back Right Leg (right_I): PWM 6 (horizontal), PWM 7 (vertical)
+
+   d. Camera Servos (PWM 12-13)
+
+   - PWM 12: Camera Left/Right movement
+   - PWM 13: Camera Up/Down movement
+
+   e. Unused PWMs
+
+   - PWM 14: Not used in this code
+   - PWM 15: Not used in this code
+
+5. Coding guidelines:
+   - When working with the project code, please do not remove the commented code!

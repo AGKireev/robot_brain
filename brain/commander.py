@@ -97,7 +97,7 @@ class Commander:
             
             # Light commands
             "police": lambda: self._handle_light("police"),
-            "policeOff": lambda: self._handle_light("policeOff"),
+            "off": lambda: self._handle_light("off"),
             
             # Servo calibration commands
             # TODO: Must be refactored, as the config file structure changed!
@@ -176,8 +176,8 @@ class Commander:
         """Handle light strip commands."""
         if command == "police":
             self.light_strip.police()
-        elif command == "policeOff":
-            self.light_strip.pause()
+        elif command == "off":
+            self.light_strip.off()
 
     def _handle_servo_calibration(self, command: str, servo_num: Optional[int] = None) -> None:
         """Handle servo calibration commands."""
