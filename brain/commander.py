@@ -62,15 +62,16 @@ class Commander:
             return {"status": "error", "message": "Invalid JSON command"}
 
         command = task["command"]
+        params = task.get("params", {})
 
         # Update command mappings
         commands_available = {
             # Movement commands
-            "forward": lambda: self._handle_movement("forward"),
-            "backward": lambda: self._handle_movement("backward"),
+            "forward": lambda: self._handle_movement("forward", params),
+            "backward": lambda: self._handle_movement("backward", params),
             "move_stop": lambda: self._handle_movement("stand"),
-            "left": lambda: self._handle_turn("left"),
-            "right": lambda: self._handle_turn("right"),
+            "left": lambda: self._handle_turn("left", params),
+            "right": lambda: self._handle_turn("right", params),
             "turn_stop": lambda: self._handle_turn("no"),
             
             # Camera movement commands
@@ -124,22 +125,44 @@ class Commander:
             logger.error(f"Error executing command {command}: {str(e)}")
             return {"status": "error", "message": f"Command execution failed: {str(e)}"}
 
-    def _handle_movement(self, direction: str):
+    def _handle_movement(self, direction: str, params: dict = None):
         """Handle movement commands (forward, backward, stand)"""
         valid_directions = {"forward", "backward", "stand"}
         if direction not in valid_directions:
             raise ValueError(f"Invalid movement direction: {direction}")
-        
+
         # Always reset turn command when changing direction
         self.turn_command = "no"
         self.direction_command = direction
-        self.legs_movement.command(self.direction_command)  # Use legs_movement instance
 
-    def _handle_turn(self, direction: str):
+        # Set default values
+        smooth = 1  # Default to smooth mode
+        speed = 5  # Default speed
+        turn_speed = 5 # Default turn speed
+
+        if params:
+            smooth = params.get("smooth", smooth)
+            speed = params.get("speed", speed)
+            turn_speed = params.get("turn_speed", turn_speed)
+
+        self.legs_movement.command(self.direction_command, smooth, speed, turn_speed)
+
+    def _handle_turn(self, direction: str, params: dict = None):
         """Handle turning commands (left, right, no)"""
         # Don't reset direction_command when turning
         self.turn_command = "no" if direction == "turn_stop" else direction
-        self.legs_movement.command(self.turn_command)
+
+        # Set default values
+        smooth = 1  # Default to smooth mode
+        speed = 5  # Default speed
+        turn_speed = 5 # Default turn speed
+
+        if params:
+            smooth = params.get("smooth", smooth)
+            speed = params.get("speed", speed)
+            turn_speed = params.get("turn_speed", turn_speed)
+
+        self.legs_movement.command(self.turn_command, smooth, speed, turn_speed)
 
     def _handle_camera_look(self, direction: str) -> None:
         """Handle camera look commands."""

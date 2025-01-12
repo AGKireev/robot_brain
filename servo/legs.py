@@ -151,14 +151,17 @@ class LegsMovement:
 
         return MovementThread(self)
 
-    def command(self, command_input: str) -> None:
+    def command(self, command_input: str, smooth: int = 1, speed: int = 5, turn_speed: int = 5) -> None:
         """Process movement commands.
         
         Args:
             command_input: Command to execute (forward, backward, left, right, stand, no)
+            smooth: Enable smooth mode (1 or 0)
+            speed: Movement speed (0-10)
+            turn_speed: Turn speed (0-10)
         """
         with self._command_lock:
-            logger.info(f"Processing command: {command_input}")
+            logger.info(f"Processing command: {command_input}, smooth: {smooth}, speed: {speed}, turn_speed: {turn_speed}")
             
             # Store previous state for logging
             prev_direction = self.direction_command
@@ -174,6 +177,9 @@ class LegsMovement:
                 self.direction_command = 'forward'
                 self.turn_command = 'no'  # Clear any turn command
                 self.move_stu = 1
+                self.SmoothMode = smooth
+                self.speed_set = self._map_speed(speed)
+                self.DOVE_SPEED = self._map_speed(speed)
                 self.movement_thread.resume()
                 logger.info(f"Starting forward movement (prev: direction={prev_direction}, turn={prev_turn})")
                 
@@ -182,6 +188,9 @@ class LegsMovement:
                 self.direction_command = 'backward'
                 self.turn_command = 'no'  # Clear any turn command
                 self.move_stu = 1
+                self.SmoothMode = smooth
+                self.speed_set = self._map_speed(speed)
+                self.DOVE_SPEED = self._map_speed(speed)
                 self.movement_thread.resume()
                 logger.info(f"Starting backward movement (prev: direction={prev_direction}, turn={prev_turn})")
                 
@@ -199,6 +208,9 @@ class LegsMovement:
                 self.turn_command = 'left'
                 self.direction_command = 'no'  # Clear any direction command
                 self.move_stu = 1
+                self.SmoothMode = smooth
+                self.speed_set = self._map_speed(turn_speed)
+                self.DOVE_SPEED = self._map_speed(turn_speed)
                 self.movement_thread.resume()
                 logger.info(f"Starting left turn (prev: direction={prev_direction}, turn={prev_turn})")
                 
@@ -207,6 +219,9 @@ class LegsMovement:
                 self.turn_command = 'right'
                 self.direction_command = 'no'  # Clear any direction command
                 self.move_stu = 1
+                self.SmoothMode = smooth
+                self.speed_set = self._map_speed(turn_speed)
+                self.DOVE_SPEED = self._map_speed(turn_speed)
                 self.movement_thread.resume()
                 logger.info(f"Starting right turn (prev: direction={prev_direction}, turn={prev_turn})")
                 
@@ -243,6 +258,34 @@ class LegsMovement:
             
             else:
                 logger.warning(f"Unknown command: {command_input}")
+
+    def _map_speed(self, speed: int) -> int:
+        """Map speed from 0-10 to actual speed values."""
+        # Example mapping, adjust as needed
+        if speed == 0:
+            return 0
+        elif speed == 1:
+            return 5
+        elif speed == 2:
+            return 10
+        elif speed == 3:
+            return 15
+        elif speed == 4:
+            return 20
+        elif speed == 5:
+            return 25
+        elif speed == 6:
+            return 30
+        elif speed == 7:
+            return 35
+        elif speed == 8:
+            return 40
+        elif speed == 9:
+            return 45
+        elif speed == 10:
+            return 50
+        else:
+            return 25
 
     def control_leg(self, leg_id: str, pos: int, wiggle: int, heightAdjust: int = 0) -> None:
         """Control a single leg's movement.
