@@ -1,13 +1,10 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Runtime configuration
-config.json
-
-# Environment
-.env
-venv/
-env/
-.idea
+# File konfigurasi IDE
+# ---------------------
+/nbproject/
+.idea/*
+# File cache Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
