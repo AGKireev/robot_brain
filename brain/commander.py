@@ -137,10 +137,9 @@ class Commander:
 
     def _handle_turn(self, direction: str):
         """Handle turning commands (left, right, no)"""
-        # Always reset direction command when turning
-        self.direction_command = "no"
+        # Don't reset direction_command when turning
         self.turn_command = "no" if direction == "turn_stop" else direction
-        self.legs_movement.command(self.turn_command)  # Updated to use legs_movement instance
+        self.legs_movement.command(self.turn_command)
 
     def _handle_camera_look(self, direction: str) -> None:
         """Handle camera look commands."""

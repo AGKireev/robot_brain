@@ -364,7 +364,7 @@ class LegsMovement:
                     self.control_leg('left_III', step_II, -speed)
                     
         elif command == 'left':
-            # Similar pattern but with opposite directions for left/right legs
+            # Apply opposite speed for left and right legs
             if step_input == 1:
                 self.control_leg('right_I', step_input, speed, lift_height)
                 self.control_leg('left_II', step_input, -speed, lift_height)
@@ -386,7 +386,7 @@ class LegsMovement:
                     self.control_leg('left_III', step_II, speed)
                     
         elif command == 'right':
-            # Mirror of left turn
+            # Apply opposite speed for right and left legs
             if step_input == 1:
                 self.control_leg('right_I', step_input, -speed, lift_height)
                 self.control_leg('left_II', step_input, speed, lift_height)
@@ -557,7 +557,8 @@ class LegsMovement:
         if not self.steadyMode:
             logger.debug(f"Movement state - Direction: {self.direction_command}, Turn: {self.turn_command}, Step: {self.step_set}")
             
-            if self.direction_command in ['forward', 'backward']:
+            # Handle forward/backward movement when not turning
+            if self.direction_command in ['forward', 'backward'] and self.turn_command == 'no':
                 speed = self.DOVE_SPEED if self.direction_command == 'forward' else -self.DOVE_SPEED
                 if self.SmoothMode:
                     logger.debug(f"Smooth {self.direction_command} movement - Speed: {speed}, Step: {self.step_set}")
@@ -569,8 +570,9 @@ class LegsMovement:
                     time.sleep(0.1)
                 
                 self.step_set = (self.step_set % 4) + 1
-                
-            elif self.turn_command in ['left', 'right']:
+
+            # Handle turns separately from forward/backward movement
+            if self.turn_command != 'no':
                 if self.SmoothMode:
                     logger.debug(f"Smooth {self.turn_command} turn - Step: {self.step_set}")
                     self.dove(self.step_set, 35, 0.001, self.DPI, self.turn_command)
@@ -581,7 +583,8 @@ class LegsMovement:
                 
                 self.step_set = (self.step_set % 4) + 1
 
-            elif self.direction_command == 'stand':
+            # Handle stand command
+            if self.turn_command == 'no' and self.direction_command == 'stand':
                 logger.debug("Moving to stand position")
                 self.stand()
                 self.step_set = 1
