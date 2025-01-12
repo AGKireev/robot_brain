@@ -261,31 +261,33 @@ class LegsMovement:
 
     def _map_speed(self, speed: int) -> int:
         """Map speed from 0-10 to actual speed values."""
-        # Example mapping, adjust as needed
+        # Ensure minimum speed is at least DPI value
+        min_speed = max(self.DPI, 5)
+        
         if speed == 0:
-            return 0
+            return min_speed  # Changed from 0 to min_speed
         elif speed == 1:
-            return 5
+            return max(min_speed, 10)
         elif speed == 2:
-            return 10
+            return max(min_speed, 15)
         elif speed == 3:
-            return 15
+            return max(min_speed, 20)
         elif speed == 4:
-            return 20
+            return max(min_speed, 25)
         elif speed == 5:
-            return 25
+            return max(min_speed, 30)
         elif speed == 6:
-            return 30
+            return max(min_speed, 35)
         elif speed == 7:
-            return 35
+            return max(min_speed, 40)
         elif speed == 8:
-            return 40
+            return max(min_speed, 45)
         elif speed == 9:
-            return 45
+            return max(min_speed, 50)
         elif speed == 10:
-            return 50
+            return max(min_speed, 55)
         else:
-            return 25
+            return max(min_speed, 30)
 
     def control_leg(self, leg_id: str, pos: int, wiggle: int, heightAdjust: int = 0) -> None:
         """Control a single leg's movement.
@@ -494,15 +496,17 @@ class LegsMovement:
                 else:  # rightSide_height == 0
                     self.sc.set_servo_pwm(leg['vert'], leg['pwm_v'] - vertical)
         
-        step_II = step_input + 2
-        if step_II > 4:
-            step_II = step_II - 4
-
-        # Use absolute speed value for calculations, direction is handled in dove_control_leg
+        # Use absolute speed value for calculations
         abs_speed = abs(speed)
         
+        # Calculate step size, ensure it's at least 1
+        step_size = max(1, int(abs_speed / dpi))
+        
+        # Calculate range end point
+        range_end = abs_speed + step_size
+        
         if step_input == 1:
-            for speed_I in range(0, (abs_speed + int(abs_speed / dpi)), int(abs_speed / dpi)):
+            for speed_I in range(0, range_end, step_size):
                 if self.move_stu and command == 'no':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
@@ -542,7 +546,7 @@ class LegsMovement:
                     break
 
         elif step_input == 2:
-            for speed_I in range(0, (abs_speed + int(abs_speed / dpi)), int(abs_speed / dpi)):
+            for speed_I in range(0, range_end, step_size):
                 if self.move_stu and command == 'no':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
@@ -580,7 +584,7 @@ class LegsMovement:
                     break
 
         elif step_input == 3:
-            for speed_I in range(0, (abs_speed + int(abs_speed / dpi)), int(abs_speed / dpi)):
+            for speed_I in range(0, range_end, step_size):
                 if self.move_stu and command == 'no':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
@@ -616,7 +620,7 @@ class LegsMovement:
                     break
 
         elif step_input == 4:
-            for speed_I in range(0, (abs_speed + int(abs_speed / dpi)), int(abs_speed / dpi)):
+            for speed_I in range(0, range_end, step_size):
                 if self.move_stu and command == 'no':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
@@ -658,12 +662,12 @@ class LegsMovement:
             
             # Handle forward/backward movement when not turning
             if self.direction_command in ['forward', 'backward'] and self.turn_command == 'no':
-                speed = self.DOVE_SPEED if self.direction_command == 'forward' else -self.DOVE_SPEED
                 if self.SmoothMode:
+                    speed = self.DOVE_SPEED if self.direction_command == 'forward' else -self.DOVE_SPEED
                     logger.debug(f"Smooth {self.direction_command} movement - Speed: {speed}, Step: {self.step_set}")
                     self.dove(self.step_set, speed, 0.001, self.DPI, 'no')
                 else:
-                    speed = 35 if self.direction_command == 'forward' else -35
+                    speed = self.speed_set if self.direction_command == 'forward' else -self.speed_set
                     logger.debug(f"Normal {self.direction_command} movement - Speed: {speed}, Step: {self.step_set}")
                     self.move(self.step_set, speed, 'no')
                     time.sleep(0.1)
@@ -674,10 +678,10 @@ class LegsMovement:
             if self.turn_command != 'no':
                 if self.SmoothMode:
                     logger.debug(f"Smooth {self.turn_command} turn - Step: {self.step_set}")
-                    self.dove(self.step_set, 35, 0.001, self.DPI, self.turn_command)
+                    self.dove(self.step_set, self.DOVE_SPEED, 0.001, self.DPI, self.turn_command)
                 else:
                     logger.debug(f"Normal {self.turn_command} turn - Step: {self.step_set}")
-                    self.move(self.step_set, 35, self.turn_command)
+                    self.move(self.step_set, self.speed_set, self.turn_command)
                     time.sleep(0.1)
                 
                 self.step_set = (self.step_set % 4) + 1
