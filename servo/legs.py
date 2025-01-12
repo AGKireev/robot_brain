@@ -512,6 +512,26 @@ class LegsMovement:
                     dove_control_leg('left_II', -speed_II, -10)
                     dove_control_leg('right_III', -speed_II, -10)
                     time.sleep(timeLast / dpi)
+                elif command == 'left':
+                    speed_II = speed_I
+                    speed_I = abs_speed - speed_I
+                    dove_control_leg('left_I', -speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('right_II', speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('left_III', -speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('right_I', -speed_II, -10)
+                    dove_control_leg('left_II', speed_II, -10)
+                    dove_control_leg('right_III', -speed_II, -10)
+                    time.sleep(timeLast / dpi)
+                elif command == 'right':
+                    speed_II = speed_I
+                    speed_I = abs_speed - speed_I
+                    dove_control_leg('left_I', speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('right_II', -speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('left_III', speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('right_I', speed_II, -10)
+                    dove_control_leg('left_II', -speed_II, -10)
+                    dove_control_leg('right_III', speed_II, -10)
+                    time.sleep(timeLast / dpi)
 
                 if self.move_stu == 0 and command == 'no':
                     break
@@ -521,14 +541,32 @@ class LegsMovement:
                 if self.move_stu and command == 'no':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
-                    # First tripod stays down
                     dove_control_leg('left_I', speed_I, -10)
                     dove_control_leg('right_II', speed_I, -10)
                     dove_control_leg('left_III', speed_I, -10)
-                    # Second tripod lifts and moves forward
                     dove_control_leg('right_I', -speed_I, 3 * speed_II)
                     dove_control_leg('left_II', -speed_I, 3 * speed_II)
                     dove_control_leg('right_III', -speed_I, 3 * speed_II)
+                    time.sleep(timeLast / dpi)
+                elif command == 'left':
+                    speed_II = speed_I
+                    speed_I = abs_speed - speed_I
+                    dove_control_leg('left_I', -speed_I, -10)
+                    dove_control_leg('right_II', speed_I, -10)
+                    dove_control_leg('left_III', -speed_I, -10)
+                    dove_control_leg('right_I', -speed_I, 3 * speed_II)
+                    dove_control_leg('left_II', speed_I, 3 * speed_II)
+                    dove_control_leg('right_III', -speed_I, 3 * speed_II)
+                    time.sleep(timeLast / dpi)
+                elif command == 'right':
+                    speed_II = speed_I
+                    speed_I = abs_speed - speed_I
+                    dove_control_leg('left_I', speed_I, -10)
+                    dove_control_leg('right_II', -speed_I, -10)
+                    dove_control_leg('left_III', speed_I, -10)
+                    dove_control_leg('right_I', speed_I, 3 * speed_II)
+                    dove_control_leg('left_II', -speed_I, 3 * speed_II)
+                    dove_control_leg('right_III', speed_I, 3 * speed_II)
                     time.sleep(timeLast / dpi)
 
                 if self.move_stu == 0 and command == 'no':
@@ -539,14 +577,32 @@ class LegsMovement:
                 if self.move_stu and command == 'no':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
-                    # First tripod moves forward
                     dove_control_leg('left_I', -speed_II, -10)
                     dove_control_leg('right_II', -speed_II, -10)
                     dove_control_leg('left_III', -speed_II, -10)
-                    # Second tripod moves down and back
                     dove_control_leg('right_I', speed_II, 3 * (abs_speed - speed_II))
                     dove_control_leg('left_II', speed_II, 3 * (abs_speed - speed_II))
                     dove_control_leg('right_III', speed_II, 3 * (abs_speed - speed_II))
+                    time.sleep(timeLast / dpi)
+                elif command == 'left':
+                    speed_II = speed_I
+                    speed_I = abs_speed - speed_I
+                    dove_control_leg('left_I', speed_II, -10)
+                    dove_control_leg('right_II', -speed_II, -10)
+                    dove_control_leg('left_III', speed_II, -10)
+                    dove_control_leg('right_I', speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('left_II', -speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('right_III', speed_II, 3 * (abs_speed - speed_II))
+                    time.sleep(timeLast / dpi)
+                elif command == 'right':
+                    speed_II = speed_I
+                    speed_I = abs_speed - speed_I
+                    dove_control_leg('left_I', -speed_II, -10)
+                    dove_control_leg('right_II', speed_II, -10)
+                    dove_control_leg('left_III', -speed_II, -10)
+                    dove_control_leg('right_I', -speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('left_II', speed_II, 3 * (abs_speed - speed_II))
+                    dove_control_leg('right_III', -speed_II, 3 * (abs_speed - speed_II))
                     time.sleep(timeLast / dpi)
 
                 if self.move_stu == 0 and command == 'no':
