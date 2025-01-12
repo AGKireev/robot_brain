@@ -463,41 +463,39 @@ class LegsMovement:
                 if self.move_stu and command == 'no':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
-                    # First tripod: right legs forward (-speed), left legs backward (+speed)
-                    dove_control_leg('left_I', speed_I, 3 * speed_II)        # Left leg back
-                    dove_control_leg('right_II', -speed_I, 3 * speed_II)     # Right leg forward
-                    dove_control_leg('left_III', speed_I, 3 * speed_II)      # Left leg back
-                    # Second tripod: maintain ground contact, opposite movement
-                    dove_control_leg('right_I', -speed_I, -10)               # Right leg forward
-                    dove_control_leg('left_II', speed_I, -10)                # Left leg back
-                    dove_control_leg('right_III', -speed_I, -10)             # Right leg forward
+                    # First tripod moves up and forward
+                    dove_control_leg('left_I', -speed_I, 3 * speed_II)
+                    dove_control_leg('right_II', -speed_I, 3 * speed_II)
+                    dove_control_leg('left_III', -speed_I, 3 * speed_II)
+                    # Second tripod stays down and moves backward
+                    dove_control_leg('right_I', speed_I, -10)
+                    dove_control_leg('left_II', speed_I, -10)
+                    dove_control_leg('right_III', speed_I, -10)
                     time.sleep(timeLast / dpi)
-                elif command == 'left' and self.move_stu:
+                elif command == 'left':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
-                    # First tripod: right legs forward (-speed), left legs backward (+speed)
-                    dove_control_leg('left_I', speed_I, 3 * speed_II)        # Left leg back
-                    dove_control_leg('right_II', -speed_I, 3 * speed_II)     # Right leg forward
-                    dove_control_leg('left_III', speed_I, 3 * speed_II)      # Left leg back
-                    # Second tripod: maintain ground contact, opposite movement
-                    dove_control_leg('right_I', -speed_I, -10)               # Right leg forward
-                    dove_control_leg('left_II', speed_I, -10)                # Left leg back
-                    dove_control_leg('right_III', -speed_I, -10)             # Right leg forward
+                    dove_control_leg('left_I', speed_I, 3 * speed_II)
+                    dove_control_leg('right_II', -speed_I, 3 * speed_II)
+                    dove_control_leg('left_III', speed_I, 3 * speed_II)
+
+                    dove_control_leg('right_I', speed_I, -10)
+                    dove_control_leg('left_II', -speed_I, -10)
+                    dove_control_leg('right_III', speed_I, -10)
                     time.sleep(timeLast / dpi)
-                elif command == 'right' and self.move_stu:
+                elif command == 'right':
                     speed_II = speed_I
                     speed_I = abs_speed - speed_I
-                    # First tripod: left legs forward (-speed), right legs backward (+speed)
-                    dove_control_leg('left_I', -speed_I, 3 * speed_II)       # Left leg forward
-                    dove_control_leg('right_II', speed_I, 3 * speed_II)      # Right leg back
-                    dove_control_leg('left_III', -speed_I, 3 * speed_II)     # Left leg forward
-                    # Second tripod: maintain ground contact, opposite movement
-                    dove_control_leg('right_I', speed_I, -10)                # Right leg back
-                    dove_control_leg('left_II', -speed_I, -10)               # Left leg forward
-                    dove_control_leg('right_III', speed_I, -10)              # Right leg back
+                    dove_control_leg('left_I', -speed_I, 3 * speed_II)
+                    dove_control_leg('right_II', speed_I, 3 * speed_II)
+                    dove_control_leg('left_III', -speed_I, 3 * speed_II)
+
+                    dove_control_leg('right_I', -speed_I, -10)
+                    dove_control_leg('left_II', speed_I, -10)
+                    dove_control_leg('right_III', -speed_I, -10)
                     time.sleep(timeLast / dpi)
 
-                if self.move_stu == 0:
+                if self.move_stu == 0 and command == 'no':
                     break
 
         elif step_input == 2:
@@ -515,7 +513,7 @@ class LegsMovement:
                     dove_control_leg('right_III', -speed_II, -10)
                     time.sleep(timeLast / dpi)
 
-                if self.move_stu == 0:
+                if self.move_stu == 0 and command == 'no':
                     break
 
         elif step_input == 3:
@@ -533,7 +531,7 @@ class LegsMovement:
                     dove_control_leg('right_III', -speed_I, 3 * speed_II)
                     time.sleep(timeLast / dpi)
 
-                if self.move_stu == 0:
+                if self.move_stu == 0 and command == 'no':
                     break
 
         elif step_input == 4:
@@ -551,7 +549,7 @@ class LegsMovement:
                     dove_control_leg('right_III', speed_II, 3 * (abs_speed - speed_II))
                     time.sleep(timeLast / dpi)
 
-                if self.move_stu == 0:
+                if self.move_stu == 0 and command == 'no':
                     break
 
     def _move_thread(self) -> None:
