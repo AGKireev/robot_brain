@@ -40,6 +40,7 @@ class LegsMovement:
         self.turn_command = 'no'
         self.SmoothMode = 1
         self.steadyMode = 0
+        self.completing_movement = False  # New flag to track movement completion
         
         # Steady mode configuration
         self.steady_range_Min = -40
@@ -162,52 +163,66 @@ class LegsMovement:
         if command_input == 'forward':
             self.direction_command = 'forward'
             self.turn_command = 'no'  # Clear any turn command
+            self.completing_movement = False
             self.movement_thread.resume()
             logger.info(f"Starting forward movement (prev: direction={prev_direction}, turn={prev_turn})")
             
         elif command_input == 'backward':
             self.direction_command = 'backward'
             self.turn_command = 'no'  # Clear any turn command
+            self.completing_movement = False
             self.movement_thread.resume()
             logger.info(f"Starting backward movement (prev: direction={prev_direction}, turn={prev_turn})")
             
         elif command_input == 'stand':
             self.direction_command = 'stand'
             self.turn_command = 'no'
+            self.completing_movement = False
             self.movement_thread.pause()
             logger.info(f"Moving to stand position (prev: direction={prev_direction}, turn={prev_turn})")
             
         elif command_input == 'left':
             self.turn_command = 'left'
             self.direction_command = 'no'  # Clear any direction command
+            self.completing_movement = False
             self.movement_thread.resume()
             logger.info(f"Starting left turn (prev: direction={prev_direction}, turn={prev_turn})")
             
         elif command_input == 'right':
             self.turn_command = 'right'
             self.direction_command = 'no'  # Clear any direction command
+            self.completing_movement = False
             self.movement_thread.resume()
             logger.info(f"Starting right turn (prev: direction={prev_direction}, turn={prev_turn})")
             
         elif command_input == 'no':
-            self.turn_command = 'no'
-            self.direction_command = 'no'
-            self.movement_thread.pause()
-            logger.info(f"Stopping all movement (prev: direction={prev_direction}, turn={prev_turn})")
+            # If we were moving, set completing_movement flag
+            if self.direction_command in ['forward', 'backward'] or self.turn_command in ['left', 'right']:
+                self.completing_movement = True
+                logger.info("Completing current movement cycle before stopping")
+            else:
+                self.completing_movement = False
+                self.turn_command = 'no'
+                self.direction_command = 'no'
+                self.movement_thread.pause()
+                logger.info(f"Stopping all movement (prev: direction={prev_direction}, turn={prev_turn})")
             
         elif command_input == 'automaticOff':
             self.SmoothMode = 0
             self.steadyMode = 0
+            self.completing_movement = False
             self.movement_thread.pause()
             logger.info("Disabled automatic/smooth mode")
             
         elif command_input == 'automatic':
             self.movement_thread.resume()
+            self.completing_movement = False
             self.SmoothMode = 1
             logger.info("Enabled automatic/smooth mode")
             
         elif command_input == 'KD':
             self.steadyMode = 1
+            self.completing_movement = False
             self.movement_thread.resume()
             logger.info("Enabled steady mode with Kalman filter")
         
@@ -527,7 +542,51 @@ class LegsMovement:
         if not self.steadyMode:
             logger.debug(f"Movement state - Direction: {self.direction_command}, Turn: {self.turn_command}, Step: {self.step_set}")
             
-            if self.direction_command in ['forward', 'backward']:
+            # Check if we're completing a movement cycle
+            if self.completing_movement:
+                # Continue the current movement until we reach step 1 (initial position)
+                if self.direction_command in ['forward', 'backward']:
+                    speed = self.DOVE_SPEED if self.direction_command == 'forward' else -self.DOVE_SPEED
+                    if self.SmoothMode:
+                        logger.debug(f"Completing {self.direction_command} movement - Speed: {speed}, Step: {self.step_set}")
+                        self.dove(self.step_set, speed, 0.001, self.DPI, 'no')
+                    else:
+                        speed = 35 if self.direction_command == 'forward' else -35
+                        logger.debug(f"Completing {self.direction_command} movement - Speed: {speed}, Step: {self.step_set}")
+                        self.move(self.step_set, speed, 'no')
+                        time.sleep(0.1)
+                    
+                    # Update step and check if we've completed the cycle
+                    self.step_set = (self.step_set % 4) + 1
+                    if self.step_set == 1:
+                        self.completing_movement = False
+                        self.direction_command = 'no'
+                        self.turn_command = 'no'
+                        self.movement_thread.pause()
+                        logger.info("Movement cycle completed, stopping at initial position")
+                        return
+                
+                elif self.turn_command in ['left', 'right']:
+                    if self.SmoothMode:
+                        logger.debug(f"Completing {self.turn_command} turn - Step: {self.step_set}")
+                        self.dove(self.step_set, 35, 0.001, self.DPI, self.turn_command)
+                    else:
+                        logger.debug(f"Completing {self.turn_command} turn - Step: {self.step_set}")
+                        self.move(self.step_set, 35, self.turn_command)
+                        time.sleep(0.1)
+                    
+                    # Update step and check if we've completed the cycle
+                    self.step_set = (self.step_set % 4) + 1
+                    if self.step_set == 1:
+                        self.completing_movement = False
+                        self.direction_command = 'no'
+                        self.turn_command = 'no'
+                        self.movement_thread.pause()
+                        logger.info("Turn cycle completed, stopping at initial position")
+                        return
+            
+            # Normal movement processing
+            elif self.direction_command in ['forward', 'backward']:
                 speed = self.DOVE_SPEED if self.direction_command == 'forward' else -self.DOVE_SPEED
                 if self.SmoothMode:
                     logger.debug(f"Smooth {self.direction_command} movement - Speed: {speed}, Step: {self.step_set}")
