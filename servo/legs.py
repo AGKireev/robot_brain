@@ -27,6 +27,10 @@ class LegsMovement:
         self.config = base.servo_config['legs']
         logger.debug(f"Loaded leg configuration: {self.config}")
         
+        # Add command state lock
+        self._command_lock = threading.Lock()
+        self._current_command = None
+        
         # Movement parameters
         self.height_change = 30
         self.move_stu = 1
@@ -153,67 +157,92 @@ class LegsMovement:
         Args:
             command_input: Command to execute (forward, backward, left, right, stand, no)
         """
-        logger.info(f"Processing command: {command_input}")
-        
-        # Store previous state for logging
-        prev_direction = self.direction_command
-        prev_turn = self.turn_command
-        
-        if command_input == 'forward':
-            self.direction_command = 'forward'
-            self.turn_command = 'no'  # Clear any turn command
-            self.movement_thread.resume()
-            logger.info(f"Starting forward movement (prev: direction={prev_direction}, turn={prev_turn})")
+        with self._command_lock:
+            logger.info(f"Processing command: {command_input}")
             
-        elif command_input == 'backward':
-            self.direction_command = 'backward'
-            self.turn_command = 'no'  # Clear any turn command
-            self.movement_thread.resume()
-            logger.info(f"Starting backward movement (prev: direction={prev_direction}, turn={prev_turn})")
+            # Store previous state for logging
+            prev_direction = self.direction_command
+            prev_turn = self.turn_command
             
-        elif command_input == 'stand':
-            self.direction_command = 'stand'
-            self.turn_command = 'no'
-            self.movement_thread.pause()
-            logger.info(f"Moving to stand position (prev: direction={prev_direction}, turn={prev_turn})")
+            # First stop any current movement
+            if self._current_command is not None and command_input != self._current_command:
+                self.move_stu = 0
+                self.movement_thread.pause()
+                
+            if command_input == 'forward':
+                self._current_command = 'forward'
+                self.direction_command = 'forward'
+                self.turn_command = 'no'  # Clear any turn command
+                self.move_stu = 1
+                self.movement_thread.resume()
+                logger.info(f"Starting forward movement (prev: direction={prev_direction}, turn={prev_turn})")
+                
+            elif command_input == 'backward':
+                self._current_command = 'backward'
+                self.direction_command = 'backward'
+                self.turn_command = 'no'  # Clear any turn command
+                self.move_stu = 1
+                self.movement_thread.resume()
+                logger.info(f"Starting backward movement (prev: direction={prev_direction}, turn={prev_turn})")
+                
+            elif command_input == 'stand':
+                self._current_command = 'stand'
+                self.direction_command = 'stand'
+                self.turn_command = 'no'
+                self.move_stu = 0
+                self.movement_thread.pause()
+                self.stand()
+                logger.info(f"Moving to stand position (prev: direction={prev_direction}, turn={prev_turn})")
+                
+            elif command_input == 'left':
+                self._current_command = 'left'
+                self.turn_command = 'left'
+                self.direction_command = 'no'  # Clear any direction command
+                self.move_stu = 1
+                self.movement_thread.resume()
+                logger.info(f"Starting left turn (prev: direction={prev_direction}, turn={prev_turn})")
+                
+            elif command_input == 'right':
+                self._current_command = 'right'
+                self.turn_command = 'right'
+                self.direction_command = 'no'  # Clear any direction command
+                self.move_stu = 1
+                self.movement_thread.resume()
+                logger.info(f"Starting right turn (prev: direction={prev_direction}, turn={prev_turn})")
+                
+            elif command_input == 'no':
+                self._current_command = 'no'
+                self.move_stu = 0  # Stop any ongoing movement cycles
+                self.turn_command = 'no'
+                self.direction_command = 'no'
+                self.movement_thread.pause()
+                self.stand()
+                logger.info(f"Stopping all movement and returning to stand position (prev: direction={prev_direction}, turn={prev_turn})")
+                
+            elif command_input == 'automaticOff':
+                self._current_command = 'automaticOff'
+                self.SmoothMode = 0
+                self.steadyMode = 0
+                self.move_stu = 0
+                self.movement_thread.pause()
+                logger.info("Disabled automatic/smooth mode")
+                
+            elif command_input == 'automatic':
+                self._current_command = 'automatic'
+                self.movement_thread.resume()
+                self.SmoothMode = 1
+                self.move_stu = 1
+                logger.info("Enabled automatic/smooth mode")
+                
+            elif command_input == 'KD':
+                self._current_command = 'KD'
+                self.steadyMode = 1
+                self.move_stu = 1
+                self.movement_thread.resume()
+                logger.info("Enabled steady mode with Kalman filter")
             
-        elif command_input == 'left':
-            self.turn_command = 'left'
-            self.direction_command = 'no'  # Clear any direction command
-            self.movement_thread.resume()
-            logger.info(f"Starting left turn (prev: direction={prev_direction}, turn={prev_turn})")
-            
-        elif command_input == 'right':
-            self.turn_command = 'right'
-            self.direction_command = 'no'  # Clear any direction command
-            self.movement_thread.resume()
-            logger.info(f"Starting right turn (prev: direction={prev_direction}, turn={prev_turn})")
-            
-        elif command_input == 'no':
-            self.turn_command = 'no'
-            self.direction_command = 'no'
-            self.movement_thread.pause()
-            self.stand()  # Immediately move to standing position
-            logger.info(f"Stopping all movement and returning to stand position (prev: direction={prev_direction}, turn={prev_turn})")
-            
-        elif command_input == 'automaticOff':
-            self.SmoothMode = 0
-            self.steadyMode = 0
-            self.movement_thread.pause()
-            logger.info("Disabled automatic/smooth mode")
-            
-        elif command_input == 'automatic':
-            self.movement_thread.resume()
-            self.SmoothMode = 1
-            logger.info("Enabled automatic/smooth mode")
-            
-        elif command_input == 'KD':
-            self.steadyMode = 1
-            self.movement_thread.resume()
-            logger.info("Enabled steady mode with Kalman filter")
-        
-        else:
-            logger.warning(f"Unknown command: {command_input}")
+            else:
+                logger.warning(f"Unknown command: {command_input}")
 
     def control_leg(self, leg_id: str, pos: int, wiggle: int, heightAdjust: int = 0) -> None:
         """Control a single leg's movement.
