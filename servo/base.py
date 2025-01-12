@@ -128,11 +128,12 @@ class ServoCtrl(threading.Thread):
         
         # Initialize default values for control arrays
         for channel in self.pwm_channels:
-            self.goal_positions[channel] = 300
-            self.current_positions[channel] = 300
-            self.buffer_positions[channel] = 300.0
-            self.last_positions[channel] = 300
-            self.ing_goal[channel] = 300
+            init_pos = self.init_positions[channel]  # Get position from config
+            self.goal_positions[channel] = init_pos
+            self.current_positions[channel] = init_pos
+            self.buffer_positions[channel] = float(init_pos)
+            self.last_positions[channel] = init_pos
+            self.ing_goal[channel] = init_pos
             
             # Set channel-specific limits from config
             if servo_group == 'camera':
