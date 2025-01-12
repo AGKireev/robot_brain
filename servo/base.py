@@ -590,3 +590,5 @@ class ServoCtrl(threading.Thread):
         while True:
             self.running.wait()
             self.sc_move()
+            # Add a small delay to prevent CPU spinning when idle
+            time.sleep(0.01)  # 10ms delay is short enough to not affect responsiveness
